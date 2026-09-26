@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/001_community.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/001_community.sql -f $S/002_names.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 q() { local role=$1 sub=$2; shift 2
@@ -26,7 +26,19 @@ expect() { if [[ "$3" =~ $2 ]]; then echo "ok   $1"; else echo "FAIL $1 — got:
 
 A=$(adm "insert into auth.users(email) values ('a@example.org') returning id" | head -1)
 B=$(adm "insert into auth.users(email) values ('b@example.org') returning id" | head -1)
-expect "perfis criados com nome neutro" '^Viajante [0-9A-F]{4} Viajante [0-9A-F]{4}$' "$(q anon '' 'select display_name from public.profiles')"
+expect "perfis recebem um nome da lista" '^2$' "$(adm 'select count(*) from public.profiles p join public.name_pool n on n.name = p.display_name and n.taken_by = p.id')"
+expect "ninguém muda o próprio nome" 'permission denied' "$(q authenticated $A "update public.profiles set display_name = 'Eu Mesmo' where id = '$A'")"
+expect "a lista não se lê pela API" 'permission denied|^0$' "$(q anon '' 'select count(*) from public.name_pool')"
+CH=$(q authenticated $A "select array_to_string(names, '|') from public.my_name_choices()")
+expect "4 nomes propostos para o próximo" '^[^|]+\|[^|]+\|[^|]+\|[^|]+$' "$CH"
+expect "as propostas não mudam ao recarregar" "^$CH\$" "$(q authenticated $A "select array_to_string(names, '|') from public.my_name_choices()")"
+GIFT=${CH%%|*}
+expect "não se escolhe um nome não proposto" 'name_not_offered' "$(q authenticated $A "select public.give_next_name('Nome Inventado')")"
+expect "escolher o nome do próximo" "^$GIFT\$" "$(q authenticated $A "select public.give_next_name('$GIFT')")"
+expect "só uma vez" 'name_not_offered' "$(q authenticated $A "select public.give_next_name('${CH##*|}')")"
+C=$(adm "insert into auth.users(email) values ('c@example.org') returning id" | head -1)
+expect "o próximo recebe o nome deixado, e sabe por quem" "^$GIFT\|" "$(q anon '' "select p.display_name||'|'||g.display_name from public.profiles p join public.profiles g on g.id = p.named_by where p.id = '$C'")"
+expect "anon não pede propostas do site" 'permission denied' "$(q anon '' 'select * from public.my_name_choices()')"
 
 R=$(q anon "" "select request_id||' '||secret from public.app_begin_link('Poco X5')"); RID=${R%% *}; SEC=${R##* }
 expect "pedido de ligação com segredo de 64" '^[0-9a-f]{64}$' "$SEC"
@@ -40,12 +52,12 @@ expect "segredo errado falha" 'request_invalid' "$(q anon '' "select token from 
 TOK=$(q anon "" "select token from public.app_redeem_link('$RID','$SEC')")
 expect "a app recebe a chave" '^[0-9a-f]{64}$' "$TOK"
 expect "o pedido só se troca uma vez" 'request_invalid' "$(q anon '' "select token from public.app_redeem_link('$RID','$SEC')")"
-expect "whoami" '^Viajante [0-9A-F]{4}\|false\|true$' "$(q anon '' "select display_name||'|'||member||'|'||can_interact from public.app_whoami('$TOK')")"
+expect "whoami" '^[^|]+ [^|]+\|false\|true$' "$(q anon '' "select display_name||'|'||member||'|'||can_interact from public.app_whoami('$TOK')")"
 
 IID=$(q anon "" "select public.app_publish('$TOK','Gerês 3 dias','Gerês','Cascatas',3,9,'2026-09','{\"type\":\"trip_plan\"}'::jsonb,'trip-1')")
 expect "publicar" '^[0-9a-f-]{36}$' "$IID"
 expect "voltar a publicar atualiza o mesmo" '^t$' "$(q anon '' "select public.app_publish('$TOK','Gerês 3 dias v2','Gerês','',3,10,'2026-09','{}'::jsonb,'trip-1') = '$IID'")"
-expect "feed sem conta" '^Gerês 3 dias v2\|0\|Viajante' "$(q anon '' "select i.title||'|'||i.like_count||'|'||p.display_name from public.itineraries i join public.profiles p on p.id = i.author_id")"
+expect "feed sem conta" '^Gerês 3 dias v2\|0\|[^|]+ [^|]+$' "$(q anon '' "select i.title||'|'||i.like_count||'|'||p.display_name from public.itineraries i join public.profiles p on p.id = i.author_id")"
 expect "anon não escreve direto" 'permission denied' "$(q anon '' "insert into public.itineraries(author_id,title,day_count,stop_count,plan) values ('$A','x',1,1,'{}')")"
 expect "B não publica em nome de A" 'row-level security' "$(q authenticated $B "insert into public.itineraries(author_id,title,day_count,stop_count,plan) values ('$A','x',1,1,'{}')")"
 expect "ninguém mexe nos contadores" 'permission denied' "$(q authenticated $B 'update public.itineraries set like_count = 999')"
@@ -84,6 +96,6 @@ expect "o autor ainda o vê" '^1$' "$(q authenticated $A "select count(*) from p
 expect "desligar invalida a chave" 'link_invalid' "$(q anon '' "select public.app_unlink('$TOK')" >/dev/null; q anon '' "select * from public.app_whoami('$TOK')")"
 expect "anon não apaga contas" 'permission denied' "$(q anon '' 'select public.delete_my_account()')"
 q authenticated $A "select public.delete_my_account()" >/dev/null
-expect "apagar a conta leva tudo" '^0 1$' "$(q anon '' 'select count(*) from public.itineraries; select count(*) from public.profiles')"
+expect "apagar a conta leva tudo" '^0 2$' "$(q anon '' 'select count(*) from public.itineraries; select count(*) from public.profiles')"
 
 echo; [ $FAILS -eq 0 ] && echo "Tudo certo." || { echo "$FAILS falhas."; exit 1; }

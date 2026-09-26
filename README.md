@@ -16,12 +16,13 @@ Site estático (GitHub Pages) sobre uma base de dados Supabase.
 | `itinerario.html?id=…` | Um itinerário: dias, paragens, likes, comentários, denunciar |
 | `entrar.html` | Entrar com um link por email |
 | `ligar.html?pedido=…` | Confirmar a ligação da app (só "Entrar" e "Ligar"; sem planos nem preços) |
-| `conta.html` | Nome público, itinerários, telemóveis ligados, sair, apagar conta |
+| `conta.html` | O teu nome (e quem o escolheu), o nome do próximo viajante, itinerários, telemóveis ligados, sair, apagar conta |
 
 ## Configurar (uma vez)
 
-1. **Base de dados**: no Supabase, *SQL Editor* → colar `supabase/001_community.sql` → *Run*.
-   Pode correr outra vez sem estragar nada.
+1. **Base de dados**: no Supabase, *SQL Editor* → colar `supabase/001_community.sql` → *Run*;
+   depois `supabase/002_names.sql` → *Run*. Podem correr outra vez sem estragar nada.
+   No telemóvel, colar ficheiros grandes corta o texto: usar as versões em partes.
 2. **Autenticação**: *Authentication → URL Configuration*
    - Site URL: `https://jrafael-rep.github.io/plan-ish-community/`
    - Redirect URLs: `https://jrafael-rep.github.io/plan-ish-community/**`
@@ -29,6 +30,15 @@ Site estático (GitHub Pages) sobre uma base de dados Supabase.
 4. **Emails para outras pessoas**: o envio de email incluído no Supabase só chega aos membros da
    equipa do projeto. Para testers, configurar um SMTP próprio em *Authentication → Emails → SMTP*
    (por exemplo Resend, com plano grátis).
+
+## Nomes
+
+Ninguém escolhe o próprio nome. Há uma lista de 100 nomes a brincar (`name_pool`, em
+`002_names.sql`). Cada conta nova recebe o nome que alguém lhe deixou há mais tempo ou, se não
+houver, um ao acaso. Cada pessoa, uma vez, escolhe entre 4 nomes da lista o nome da próxima pessoa
+que chegar; as 4 hipóteses não mudam ao recarregar. Quem apaga a conta devolve o nome à lista.
+
+Acrescentar nomes: `insert into public.name_pool (name) values ('Chinelo Filósofo');`
 
 ## Membros
 
@@ -55,4 +65,4 @@ Só membros a interagir: `update public.community_settings set members_only = tr
   dados são as regras de acesso por linha em `supabase/001_community.sql`.
 - A chave secreta e a password da base de dados **nunca** entram neste repositório.
 - Testar as regras num Postgres 16 local que imita o Supabase: `sudo bash supabase/test/run.sh`
-  (43 verificações: ligar a app, publicar, likes, comentários, denúncias, membros, apagar conta).
+  (52 verificações: ligar a app, publicar, likes, comentários, denúncias, membros, nomes, apagar conta).

@@ -63,3 +63,5 @@ label { display: block; font-weight: 600; margin: 0 0 .35rem; }
 .comment .who { font-weight: 700; }
 footer { border-top: 1px solid var(--line); padding: 1.5rem 0 2.5rem; color: var(--muted); font-size: .875rem; }
 .hidden { display: none !important; }
+.name { font-size: 1.35rem; font-weight: 800; margin: 0 0 .25rem; }
+.choices { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0; }

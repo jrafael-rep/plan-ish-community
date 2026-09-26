@@ -38,6 +38,8 @@ export function explain(error) {
   const text = `${error?.message ?? ''} ${error?.hint ?? ''}`;
   if (/request_invalid/.test(text)) return 'Este pedido já foi usado ou expirou. Volta a carregar em "Ligar à Comunidade" na app.';
   if (/members_only/.test(text)) return 'Disponível para membros da Comunidade.';
+  if (/name_taken/.test(text)) return 'Esse nome acabou de ser atribuído a outra pessoa. Escolhe entre os novos.';
+  if (/name_not_offered/.test(text)) return 'Já escolheste o nome do próximo viajante.';
   if (/not_signed_in|JWT/.test(text)) return 'Entra na tua conta primeiro.';
   if (/Failed to fetch|NetworkError/.test(text)) return 'Sem ligação. Tenta outra vez daqui a pouco.';
   if (error?.hint) return error.hint;

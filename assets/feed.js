@@ -5,7 +5,7 @@ const status = $('status');
 notice(status, 'A carregar…');
 
 const { data, error } = await sb.from('itineraries')
-  .select('id, title, destination, summary, day_count, stop_count, travelled_month, like_count, comment_count, author:profiles(display_name)')
+  .select('id, title, destination, summary, day_count, stop_count, travelled_month, like_count, comment_count, author:profiles!itineraries_author_id_fkey(display_name)')
   .order('created_at', { ascending: false })
   .limit(60);
 

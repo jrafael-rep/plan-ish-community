@@ -29,7 +29,7 @@ const KINDS = {
 };
 
 const { data: it, error } = await sb.from('itineraries')
-  .select('id, title, destination, summary, day_count, stop_count, travelled_month, like_count, comment_count, plan, author:profiles(display_name)')
+  .select('id, title, destination, summary, day_count, stop_count, travelled_month, like_count, comment_count, plan, author:profiles!itineraries_author_id_fkey(display_name)')
   .eq('id', id).maybeSingle();
 
 if (error || !it) {
@@ -97,7 +97,7 @@ async function setupLike(it) {
 
 async function loadComments(itineraryId) {
   const { data, error } = await sb.from('comments')
-    .select('id, body, created_at, author_id, author:profiles(display_name)')
+    .select('id, body, created_at, author_id, author:profiles!comments_author_id_fkey(display_name)')
     .eq('itinerary_id', itineraryId).order('created_at');
   const box = $('comments');
   if (error) { notice(box, explain(error), 'error'); return; }

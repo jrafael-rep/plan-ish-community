@@ -12,7 +12,8 @@ async function load() {
     sb.from('memberships').select('tier, valid_until').maybeSingle(),
     sb.from('itineraries').select('id, title, travelled_month, hidden').eq('author_id', session.user.id).order('created_at', { ascending: false }),
   ]);
-  $('name').value = profile?.display_name ?? '';
+  $('name').textContent = profile?.display_name ?? '';
+  await loadNextName();
   const active = membership && (!membership.valid_until || new Date(membership.valid_until) > new Date());
   $('membership').textContent = active ? 'Membro da Comunidade.' : 'Conta da Comunidade.';
   $('mine').replaceChildren(...(mine?.length ? mine.map((it) => el('a', { class: 'card', href: `itinerario.html?id=${it.id}` },
@@ -34,11 +35,31 @@ async function loadLinks() {
   )) : [el('p', { class: 'muted' }, 'Nenhum. Na app: Comunidade › Ligar à Comunidade.')]));
 }
 
-$('name-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const { error } = await sb.from('profiles').update({ display_name: $('name').value.trim() }).eq('id', session.user.id);
-  notice(status, error ? explain(error) : 'Nome guardado.', error ? 'error' : '');
-});
+async function loadNextName() {
+  const { data, error } = await sb.rpc('my_name_choices');
+  const row = data?.[0];
+  const box = $('next-name');
+  if (error || !row) { notice(box, explain(error), 'error'); return; }
+  $('named-by').textContent = row.named_by ? `Escolhido por ${row.named_by}.` : '';
+  if (row.chosen) {
+    box.replaceChildren(el('p', {}, 'Escolheste ', el('strong', {}, row.chosen), ' para a próxima pessoa que se juntar à Comunidade.'));
+    return;
+  }
+  if (!row.names?.length) { box.replaceChildren(el('p', { class: 'muted' }, 'Não há nomes livres por agora.')); return; }
+  box.replaceChildren(
+    el('p', { class: 'muted' }, 'Escolhe o nome que a próxima pessoa vai receber. Só escolhes uma vez.'),
+    el('div', { class: 'choices' }, ...row.names.map((name) => el('button', {
+      class: 'btn', type: 'button',
+      onclick: async () => {
+        if (!confirm(`Dar o nome "${name}" à próxima pessoa? Não dá para mudar depois.`)) return;
+        const { error: err } = await sb.rpc('give_next_name', { p_name: name });
+        if (err) notice(status, explain(err), 'error');
+        await loadNextName();
+      },
+    }, name))),
+  );
+}
+
 $('signout').addEventListener('click', async () => { await sb.auth.signOut(); location.href = './'; });
 $('delete').addEventListener('click', async () => {
   if (!confirm('Apagar a conta, os itinerários publicados, os comentários e os likes? Isto não se desfaz.')) return;
