@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://gmizaoscvwarsppcmfpr.supabase.co wss://gmizaoscvwarsppcmfpr.supabase.co https://cdn.jsdelivr.net; img-src 'self' data:; style-src 'self'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Ligar o Plan-ish · Comunidade Plan-ish</title>
+<link rel="stylesheet" href="assets/style.css">
+<script type="module" src="assets/link.js"></script>
+</head>
+<body>
+<main class="wrap">
+<h1>Ligar o Plan-ish</h1>
+<div id="status"></div>
+<section id="signin" class="hidden">
+  <p>Para ligar a app, entra na tua conta da Comunidade.</p>
+  <p class="row"><a class="btn primary" id="signin-link" href="entrar.html">Entrar</a></p>
+</section>
+<section id="confirm" class="hidden">
+  <p>Ligar a app Plan-ish do telemóvel <strong id="device"></strong> à conta <strong id="account"></strong>?</p>
+  <p class="muted small">Só confirmes se foste tu que carregaste em "Ligar à Comunidade" na app, agora mesmo. A app fica a poder publicar, comentar e dar likes em teu nome. Podes desligá-la a qualquer momento, na app ou na tua conta.</p>
+  <p class="row"><button class="btn primary" id="confirm-btn" type="button">Ligar</button></p>
+</section>
+<section id="done" class="hidden">
+  <p>Está ligada. Volta à app para terminar.</p>
+  <p class="row"><a class="btn primary" id="back" href="#">Voltar ao Plan-ish</a></p>
+</section>
+</main>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://gmizaoscvwarsppcmfpr.supabase.co wss://gmizaoscvwarsppcmfpr.supabase.co https://cdn.jsdelivr.net; img-src 'self' data:; style-src 'self'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Conta · Comunidade Plan-ish</title>
+<link rel="stylesheet" href="assets/style.css">
+<script type="module" src="assets/account.js"></script>
+</head>
+<body>
+<main class="wrap">
+<h1>A tua conta</h1>
+<div id="status"></div>
+<section id="account" class="hidden">
+  <p class="muted" id="email"></p>
+  <p id="membership"></p>
+  <form id="name-form">
+    <label for="name">Nome público</label>
+    <input id="name" maxlength="40" required>
+    <p class="muted small">É o nome que aparece nos teus itinerários e comentários. O email nunca aparece.</p>
+    <p class="row"><button class="btn" type="submit">Guardar nome</button></p>
+  </form>
+  <h2>Os teus itinerários</h2>
+  <div id="mine"></div>
+  <h2>Telemóveis ligados</h2>
+  <div id="links"></div>
+  <h2>Sessão</h2>
+  <p class="row"><button class="btn" id="signout" type="button">Sair</button></p>
+  <h2>Apagar a conta</h2>
+  <p class="muted small">Apaga a conta, os itinerários que publicaste, os comentários e os likes. Não se desfaz. As viagens na app ficam no teu telemóvel.</p>
+  <p class="row"><button class="btn danger" id="delete" type="button">Apagar a minha conta</button></p>
+</section>
+</main>
+</body>
+</html>

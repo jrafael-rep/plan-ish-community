@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://gmizaoscvwarsppcmfpr.supabase.co wss://gmizaoscvwarsppcmfpr.supabase.co https://cdn.jsdelivr.net; img-src 'self' data:; style-src 'self'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Itinerário · Comunidade Plan-ish</title>
+<link rel="stylesheet" href="assets/style.css">
+<script type="module" src="assets/itinerary.js"></script>
+</head>
+<body>
+<main class="wrap">
+<div id="status"></div>
+<article id="itinerary" class="hidden">
+  <h1 id="title"></h1>
+  <p class="meta" id="meta"></p>
+  <p id="summary"></p>
+  <div class="row">
+    <a class="btn primary" id="open-app" href="#">Abrir no Plan-ish</a>
+    <button class="btn" id="like" type="button"></button>
+  </div>
+  <p class="muted small" id="like-hint"></p>
+  <div id="days"></div>
+  <h2 id="comments-title">Comentários</h2>
+  <div id="comments"></div>
+  <form id="comment-form" class="hidden">
+    <label for="comment-body">Comentar</label>
+    <textarea id="comment-body" maxlength="2000" required></textarea>
+    <p class="row"><button class="btn primary" type="submit">Publicar comentário</button></p>
+  </form>
+  <p id="comment-signin" class="muted hidden"></p>
+  <p class="small"><a href="#" id="report">Denunciar este itinerário</a></p>
+</article>
+</main>
+</body>
+</html>
