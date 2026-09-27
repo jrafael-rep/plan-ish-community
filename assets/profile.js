@@ -1,5 +1,5 @@
 import { $, avatar, badge, el, explain, header, notice, plural, photoUrl, sb, who } from './app.js';
-import { routeCover } from './card.js';
+import { missingColumn, routeCover } from './card.js';
 
 const session = await header('');
 const status = $('status');
@@ -7,10 +7,16 @@ const id = new URLSearchParams(location.search).get('id') ?? '';
 notice(status, 'A carregar…');
 
 const TILE = 'id, title, destination, day_count, evidence, photos, plan, like_count';
+const BASIC_TILE = 'id, title, destination, day_count, plan, like_count';
 
-const { data: person, error } = /^[0-9a-f-]{36}$/i.test(id)
+const valid = /^[0-9a-f-]{36}$/i.test(id);
+let { data: person, error } = valid
   ? await sb.from('profiles').select('id, display_name, created_at, named_by').eq('id', id).maybeSingle()
   : { data: null, error: null };
+// Antes do esquema 2 não há "quem escolheu o nome".
+if (valid && missingColumn(error)) {
+  ({ data: person, error } = await sb.from('profiles').select('id, display_name, created_at').eq('id', id).maybeSingle());
+}
 
 if (error || !person) {
   notice(status, error ? explain(error) : 'Este viajante não existe ou apagou a conta.', 'error');
@@ -20,13 +26,19 @@ if (error || !person) {
 
 async function render(p) {
   document.title = `${p.display_name} · Comunidade Plan-ish`;
-  const [namer, named, published, done] = await Promise.all([
+  let [namer, named, published, done] = await Promise.all([
     p.named_by ? sb.from('profiles').select('id, display_name').eq('id', p.named_by).maybeSingle() : { data: null },
-    sb.from('profiles').select('id, display_name').eq('named_by', p.id).limit(1),
+    sb.from('profiles').select('id, display_name').eq('named_by', p.id).limit(1).then((r) => (r.error ? { data: [] } : r)),
     sb.from('itineraries').select(TILE).eq('author_id', p.id).order('created_at', { ascending: false }).limit(60),
     sb.from('itinerary_completions').select(`evidence, completed_at, itinerary:itineraries(${TILE})`)
       .eq('user_id', p.id).order('completed_at', { ascending: false }).limit(60),
   ]);
+  if (missingColumn(published.error)) {
+    // Antes do esquema 3: sem prova, fotografias nem viagens feitas.
+    published = await sb.from('itineraries').select(BASIC_TILE).eq('author_id', p.id).order('created_at', { ascending: false }).limit(60);
+    done = { data: [] };
+  }
+  if (done.error) done = { data: [] };
   if (published.error) { notice(status, explain(published.error), 'error'); return; }
   status.replaceChildren();
 

@@ -8,6 +8,18 @@ export const CARD_COLUMNS = 'id, title, destination, summary, day_count, stop_co
   + 'created_at, evidence, visited_stops, gps_stops, done_count, original_done_count, budget_min, budget_max, photos, plan, '
   + 'author_id, author:profiles!itineraries_author_id_fkey(display_name)';
 
+/**
+ * Enquanto os esquemas 3 e 4 não correm na base de dados, as colunas novas
+ * (prova, orçamento, fotografias…) não existem e o pedido falha com 42703.
+ * Em vez de um erro, o site mostra o que há: o cartão aguenta-se sem elas.
+ */
+export const BASIC_COLUMNS = 'id, title, destination, summary, day_count, stop_count, travelled_month, like_count, comment_count, '
+  + 'created_at, plan, author_id, author:profiles!itineraries_author_id_fkey(display_name)';
+
+export function missingColumn(error) {
+  return error?.code === '42703' || /does not exist/.test(error?.message ?? '');
+}
+
 const KINDS = {
   activity: 'Atividade', food: 'Comida', lodging: 'Alojamento', transport: 'Transporte', shopping: 'Compras',
   pickup: 'Apanhar / deixar', sightseeing: 'Visita', nature: 'Natureza', event: 'Evento', flex: 'Tempo livre',

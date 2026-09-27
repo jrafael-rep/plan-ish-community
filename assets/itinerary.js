@@ -1,7 +1,7 @@
 import {
   $, el, explain, header, icon, notice, plural, relativeDay, sb, show, signInLink, who,
 } from './app.js';
-import { CARD_COLUMNS, likedSet, tripCard } from './card.js';
+import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, tripCard } from './card.js';
 
 const session = await header('');
 const me = session?.user.id ?? null;
@@ -9,7 +9,8 @@ const status = $('status');
 const id = new URLSearchParams(location.search).get('id') ?? '';
 notice(status, 'A carregar…');
 
-const { data: it, error } = await sb.from('itineraries').select(CARD_COLUMNS).eq('id', id).maybeSingle();
+let { data: it, error } = await sb.from('itineraries').select(CARD_COLUMNS).eq('id', id).maybeSingle();
+if (missingColumn(error)) ({ data: it, error } = await sb.from('itineraries').select(BASIC_COLUMNS).eq('id', id).maybeSingle());
 
 async function loadDoneBy(it) {
   if (!it.done_count) return;
@@ -41,9 +42,13 @@ class Thread {
 
   async load() {
     const box = $('comments');
-    const { data, error: err } = await sb.from('comments')
-      .select('id, body, created_at, author_id, parent_id, like_count, author:profiles!comments_author_id_fkey(display_name)')
-      .eq('itinerary_id', this.it.id).order('created_at');
+    const ask = (columns) => sb.from('comments').select(columns).eq('itinerary_id', this.it.id).order('created_at');
+    let { data, error: err } = await ask('id, body, created_at, author_id, parent_id, like_count, author:profiles!comments_author_id_fkey(display_name)');
+    // Sem o esquema 3, não há respostas nem gostos em comentários: mostra-se a conversa simples.
+    if (missingColumn(err)) {
+      ({ data, error: err } = await ask('id, body, created_at, author_id, author:profiles!comments_author_id_fkey(display_name)'));
+      data = data?.map((c) => ({ ...c, parent_id: null, like_count: 0 }));
+    }
     if (err) { notice(box, explain(err), 'error'); return; }
     if (me && data.length) {
       const { data: mine } = await sb.from('comment_likes').select('comment_id').in('comment_id', data.map((c) => c.id));

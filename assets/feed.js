@@ -1,5 +1,5 @@
 import { $, el, explain, header, notice, sb } from './app.js';
-import { CARD_COLUMNS, likedSet, tripCard } from './card.js';
+import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, tripCard } from './card.js';
 
 const session = await header('feed');
 const status = $('status');
@@ -61,13 +61,17 @@ async function load(append) {
   const from = append ? shown.length : 0;
   if (append) { more.disabled = true; more.textContent = 'A carregar…'; } else { notice(status, 'A carregar…'); more.hidden = true; }
   // O id desempata: uma página nunca repete nem salta viagens publicadas no mesmo instante.
-  let query = sb.from('itineraries').select(CARD_COLUMNS);
-  if (sort === 'liked') query = query.order('like_count', { ascending: false });
-  query = query.order('created_at', { ascending: false }).order('id', { ascending: false })
-    .range(from, from + PAGE - 1);
-  if (level) query = query.eq('evidence', level);
-  if (words) query = query.or(`title.ilike.*${words}*,destination.ilike.*${words}*`);
-  const { data, error } = await query;
+  const ask = (columns, basic) => {
+    let query = sb.from('itineraries').select(columns);
+    if (sort === 'liked') query = query.order('like_count', { ascending: false });
+    query = query.order('created_at', { ascending: false }).order('id', { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (level && !basic) query = query.eq('evidence', level);
+    if (words) query = query.or(`title.ilike.*${words}*,destination.ilike.*${words}*`);
+    return query;
+  };
+  let { data, error } = await ask(CARD_COLUMNS, false);
+  if (missingColumn(error)) ({ data, error } = await ask(BASIC_COLUMNS, true));
   if (mine !== request) return;
   more.disabled = false; more.textContent = 'Ver mais viagens';
   if (error) {
