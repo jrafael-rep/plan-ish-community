@@ -9,12 +9,14 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
+# Os termos (esquema 7) só se exigem nos testes do fim; até lá, como antes.
+su postgres -c "$PSQL -d sb -tAqc 'update public.community_settings set terms_version = null'"
 q() { local role=$1 sub=$2; shift 2
   su postgres -c "$PSQL -d sb -X -q -t -A" <<SQL 2>&1 | sed 's/^psql:<stdin>:[0-9]*: //' | grep -v "^CONTEXT\|^PL/pgSQL\|^LINE\|^ *\^\|^HINT" | tr '\n' ' ' | sed 's/ *$//'
 begin; set local role $role; set local "request.jwt.claim.sub" = '$sub'; $*; commit;
@@ -171,12 +173,60 @@ expect "apagar o plano avisa quem o tem aberto" "^plan-poke:$SP\\|ended\$" "$(ad
 expect "o dono apaga o plano ao sair" '^0$' "$(q anon '' "select public.app_leave_plan('$TOK','$SP')" >/dev/null; adm "select count(*) from public.shared_plans")"
 adm "delete from public.memberships"
 
+# ------------------------------------------------ 7: termos, avaliações, moderação
+adm "update public.community_settings set terms_version = 't1'" >/dev/null
+expect "publicar pede os termos" 'terms_required' "$(q anon '' "select id from public.app_publish_v2('$TOK','Minho','Minho','',1,2,'2026-07','{}'::jsonb,'trip-t', 0, 0, 0, 'test')")"
+expect "a app sabe que faltam os termos" '^t1\|false$' "$(q anon '' "select version||'|'||accepted from public.app_terms('$TOK')")"
+expect "não se aceita uma versão antiga" 'terms_outdated' "$(q anon '' "select public.app_accept_terms('$TOK','t0')")"
+expect "aceitar os termos pela app" '^t$' "$(q anon '' "select public.app_accept_terms('$TOK','t1')" >/dev/null; q anon '' "select accepted from public.app_terms('$TOK')")"
+expect "depois de aceitar, publica" '^[0-9a-f-]{36}$' "$(q anon '' "select id from public.app_publish_v2('$TOK','Minho','Minho','',1,2,'2026-07','{}'::jsonb,'trip-t', 0, 0, 0, 'test')")"
+expect "gostar não pede os termos" '^[0-9]+$' "$(q anon '' "select public.app_set_like('$BTOK','$OID',true)")"
+expect "avaliar pede os termos" 'terms_required' "$(q anon '' "select * from public.app_review('$BTOK','$OID',5,'Muito bom')")"
+q anon "" "select public.app_accept_terms('$BTOK','t1')" >/dev/null
+expect "quem fez com GPS avalia como quem fez" '^t$' "$(q anon '' "select verified from public.app_review('$BTOK','$OID',5,'  Muito bom  ')")"
+expect "médias: de quem fez e de todas" '^1\|5.0\|1\|5.0\|1$' "$(q anon '' "select verified_rating_count||'|'||verified_rating_avg||'|'||rating_count||'|'||rating_avg||'|'||review_count from public.itineraries where id = '$OID'")"
+expect "o comentário guarda-se sem espaços à volta" '^5\|Muito bom\|true$' "$(q anon '' "select stars||'|'||body||'|'||verified from public.app_my_review('$BTOK','$OID')")"
+expect "não se avalia o próprio itinerário" 'own_itinerary' "$(q anon '' "select * from public.app_review('$TOK','$OID',5,null)")"
+expect "avaliação vazia recusada" 'review_empty' "$(q anon '' "select * from public.app_review('$BTOK','$OID',null,'   ')")"
+expect "estrelas fora de 1 a 5 recusadas" 'review_invalid' "$(q anon '' "select * from public.app_review('$BTOK','$OID',6,null)")"
+expect "ninguém escreve avaliações direto" 'permission denied' "$(q authenticated $B "insert into public.reviews(itinerary_id, author_id, stars, verified) values ('$OID','$B',5,true)")"
+expect "ninguém se marca como quem fez" 'permission denied' "$(q authenticated $B "update public.reviews set verified = true")"
+D=$(adm "insert into auth.users(email) values ('d@example.org') returning id" | head -1)
+expect "comentar no site também pede os termos" 'terms_required' "$(q authenticated $D "insert into public.comments(itinerary_id, author_id, body) values ('$OID','$D','Olá')")"
+expect "aceitar os termos no site" '^t1\|true$' "$(q authenticated $D "select public.accept_terms('t1')" >/dev/null; q authenticated $D "select version||'|'||accepted from public.my_terms()")"
+expect "quem não fez avalia como geral" '^f$' "$(q authenticated $D "select verified from public.review_itinerary('$OID',3,null)")"
+expect "a média de todas conta a geral, a de quem fez não" '^1\|5.0\|2\|4.0$' "$(q anon '' "select verified_rating_count||'|'||verified_rating_avg||'|'||rating_count||'|'||rating_avg from public.itineraries where id = '$OID'")"
+expect "só comentário: sai das médias, fica na contagem" '^1\|5.0\|2$' "$(q authenticated $D "select * from public.review_itinerary('$OID',null,'Gostei do percurso')" >/dev/null; q anon '' "select rating_count||'|'||rating_avg||'|'||review_count from public.itineraries where id = '$OID'")"
+expect "as avaliações leem-se sem conta" '^2$' "$(q anon '' "select count(*) from public.reviews where itinerary_id = '$OID'")"
+DR=$(q anon "" "select request_id||' '||secret from public.app_begin_link('D')"); q authenticated $D "select public.confirm_app_link('${DR%% *}')" >/dev/null
+DTOK=$(q anon "" "select token from public.app_redeem_link('${DR%% *}','${DR##* }')")
+expect "fazer a viagem depois torna a avaliação de quem fez" '^t$' "$(q anon '' "select public.app_record_completion('$DTOK','$OID', 4, 4, 200)" >/dev/null; q anon '' "select verified from public.app_my_review('$DTOK','$OID')")"
+RV=$(q anon "" "select id from public.reviews where author_id = '$D'")
+expect "denunciar uma avaliação sem conta" '^ok$' "$(q anon '' "insert into public.reports(review_id, reason) values ('$RV','ofensivo'); select 'ok'")"
+expect "sem conta não se modera" 'permission denied' "$(q anon '' 'select count(*) from public.admin_reports()')"
+expect "quem não modera não vê denúncias" 'not_admin' "$(q authenticated $B 'select count(*) from public.admin_reports()')"
+adm "insert into private.admins(user_id) values ('$A') on conflict do nothing" >/dev/null
+expect "o site sabe quem modera" '^t f$' "$(q authenticated $A 'select public.am_i_admin()') $(q authenticated $B 'select public.am_i_admin()')"
+expect "quem modera vê a denúncia e o que foi denunciado" '^review\|Gostei do percurso\|false$' "$(q authenticated $A "select kind||'|'||excerpt||'|'||target_hidden from public.admin_reports() where target_id = '$RV'")"
+expect "esconder uma avaliação resolve a denúncia" '^1\|hidden$' "$(q authenticated $A "select public.admin_set_hidden('review','$RV',true)" >/dev/null; q anon '' "select count(*) from public.reviews where itinerary_id = '$OID'")|$(adm "select resolution from public.reports where review_id = '$RV'")"
+expect "o escondido sai das contas" '^1$' "$(q anon '' "select review_count from public.itineraries where id = '$OID'")"
+expect "o autor ainda vê a sua" '^t$' "$(q anon '' "select hidden from public.app_my_review('$DTOK','$OID')")"
+expect "quem modera não se bloqueia" 'self_block' "$(q authenticated $A "select public.admin_set_blocked('$A', true, 'teste')")"
+expect "conta bloqueada não avalia" 'account_blocked' "$(q authenticated $A "select public.admin_set_blocked('$D', true, 'spam')" >/dev/null; q anon '' "select * from public.app_review('$DTOK','$OID',1,null)")"
+expect "conta bloqueada não dá likes" 'row-level|account_blocked' "$(q authenticated $D "insert into public.likes(itinerary_id, user_id) values ('$OID','$D')")"
+expect "desbloquear devolve a voz, não o conteúdo" '^t\|0$' "$(q authenticated $A "select public.admin_set_blocked('$D', false)" >/dev/null; q anon '' "select * from public.app_review('$DTOK','$OID',4,null)" >/dev/null; q anon '' "select hidden from public.app_my_review('$DTOK','$OID')")|$(adm "select count(*) from private.blocked_accounts")"
+expect "bloquear alguém só para mim" "^$D\$" "$(q anon '' "select public.app_set_user_block('$BTOK','$D',true)" >/dev/null; q anon '' "select * from public.app_user_blocks('$BTOK')")"
+expect "não me bloqueio a mim" 'self_block' "$(q anon '' "select public.app_set_user_block('$BTOK','$B',true)")"
+expect "cada um só vê os seus bloqueios" '^0$' "$(q authenticated $A 'select count(*) from public.user_blocks')"
+expect "apagar a própria avaliação" '^0$' "$(q anon '' "select public.app_delete_review('$BTOK','$OID')" >/dev/null; q anon '' "select count(*) from public.app_my_review('$BTOK','$OID')")"
+adm "update public.community_settings set terms_version = null" >/dev/null
+
 adm "update public.itineraries set hidden = true where id = '$IID'"
 expect "escondido some do feed" '^0$' "$(q anon '' "select count(*) from public.itineraries where id = '$IID'")"
 expect "o autor ainda o vê" '^1$' "$(q authenticated $A "select count(*) from public.itineraries where id = '$IID'")"
 expect "desligar invalida a chave" 'link_invalid' "$(q anon '' "select public.app_unlink('$TOK')" >/dev/null; q anon '' "select * from public.app_whoami('$TOK')")"
 expect "anon não apaga contas" 'permission denied' "$(q anon '' 'select public.delete_my_account()')"
 q authenticated $A "select public.delete_my_account()" >/dev/null
-expect "apagar a conta leva tudo" '^0 2$' "$(q anon '' 'select count(*) from public.itineraries; select count(*) from public.profiles')"
+expect "apagar a conta leva tudo" '^0 3$' "$(q anon '' 'select count(*) from public.itineraries; select count(*) from public.profiles')"
 
 echo; [ $FAILS -eq 0 ] && echo "Tudo certo." || { echo "$FAILS falhas."; exit 1; }
