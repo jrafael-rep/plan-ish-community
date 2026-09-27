@@ -19,3 +19,8 @@ create table storage.objects (id uuid primary key default gen_random_uuid(), buc
   name text not null, unique (bucket_id, name));
 alter table storage.objects enable row level security;
 grant insert (bucket_id, name) on storage.objects to anon, authenticated;
+-- O Realtime: só a função que manda avisos, a registar o que mandaria.
+create schema realtime;
+create table realtime.sent (id bigserial primary key, payload jsonb, event text, topic text, private boolean);
+create function realtime.send(payload jsonb, event text, topic text, private boolean default true)
+returns void language sql as $$ insert into realtime.sent (payload, event, topic, private) values (payload, event, topic, private) $$;

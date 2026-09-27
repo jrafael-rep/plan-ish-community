@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 q() { local role=$1 sub=$2; shift 2
@@ -151,6 +151,8 @@ expect "o convite mostra o plano e quem convida" '^Algarve\|' "$(q authenticated
 expect "B aceita o convite" "^$SP\$" "$(q authenticated $B "select public.accept_plan_invite('$CODE')")"
 expect "convite inventado recusado" 'invite_invalid' "$(q authenticated $B "select public.accept_plan_invite('zzzzzzzzzzzz')")"
 expect "B vê o plano na app" '^Algarve\|editor\|2$' "$(q anon '' "select title||'|'||role||'|'||member_count from public.app_my_shared_plans('$BTOK')")"
+expect "cada escrita avisa o canal do plano, só com a revisão" "^plan-poke:$SP\\|changed\\|false\\|rev\$" "$(adm "select topic||'|'||event||'|'||private||'|'||(select string_agg(k, ',') from jsonb_object_keys(payload) k) from realtime.sent order by id desc limit 1")"
+expect "o aviso traz a revisão que foi escrita" '^t$' "$(adm "select (payload->>'rev')::bigint = (select max(rev) from public.shared_plan_fields) from realtime.sent order by id desc limit 1")"
 expect "B, no site, muda a duração" '^[0-9]+$' "$(q authenticated $B "select public.write_plan_fields('$SP','web-b','[{\"key\":\"stop:s1:durationMin\",\"value\":90}]'::jsonb)")"
 expect "A, na app, só recebe o que mudou depois" '^stop:s1:durationMin 90 web-b$' "$(q anon '' "select key||' '||value||' '||client_id from public.app_plan_fields_since('$TOK','$SP',$R0)")"
 q anon "" "select public.app_write_plan_fields('$TOK','$SP','dev-a','[{\"key\":\"stop:s1:name\",\"value\":\"Sagres, o cabo\"}]'::jsonb)" >/dev/null
@@ -164,6 +166,8 @@ expect "a app sabe qual dos membros é quem pergunta" '^owner$' "$(q anon '' "se
 expect "B sai do plano" '^0$' "$(q authenticated $B "select public.leave_plan('$SP')" >/dev/null; q anon '' "select count(*) from public.app_my_shared_plans('$BTOK')")"
 expect "quem não está no plano não vê os membros" 'not_in_plan' "$(q anon '' "select * from public.app_plan_members('$BTOK','$SP')")"
 expect "B volta a entrar pela app com o código" "^$SP\$" "$(q anon '' "select public.app_accept_plan_invite('$BTOK',upper('$CODE'))")"
+q anon "" "select public.app_leave_plan('$TOK','$SP')" >/dev/null
+expect "apagar o plano avisa quem o tem aberto" "^plan-poke:$SP\\|ended\$" "$(adm "select topic||'|'||event from realtime.sent order by id desc limit 1")"
 expect "o dono apaga o plano ao sair" '^0$' "$(q anon '' "select public.app_leave_plan('$TOK','$SP')" >/dev/null; adm "select count(*) from public.shared_plans")"
 adm "delete from public.memberships"
 

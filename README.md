@@ -36,7 +36,8 @@ desenha o mesmo no separador Comunidade. Ver `DESIGN.md`.
 
 1. **Base de dados**: no Supabase, *SQL Editor* → colar `supabase/001_community.sql` → *Run*;
    depois `supabase/002_names.sql`, `supabase/003_originals_and_replies.sql`,
-   `supabase/004_budget_and_photos.sql` e `supabase/005_shared_plans.sql`, por esta ordem. Podem correr outra vez sem estragar nada.
+   `supabase/004_budget_and_photos.sql`, `supabase/005_shared_plans.sql` e
+   `supabase/006_private_rls.sql`, por esta ordem. (Na base de dados da Comunidade já estão os seis.) Podem correr outra vez sem estragar nada.
    O 004 cria no Storage o bucket público `itinerary-photos` (fotografias até 700 KB, só JPEG).
    O 005 junta a tabela dos planos partilhados à publicação `supabase_realtime`; confirmar em
    *Database → Publications* que ela lá está (sem ela, o site pergunta a cada 3 s em vez de ao vivo).

@@ -7,11 +7,11 @@
 -- que mudaram, e o servidor dá-lhes um número de revisão por ordem de chegada.
 -- Duas pessoas a mudar campos diferentes nunca se estragam; no mesmo campo,
 -- fica a última escrita. Apagar é escrever "deleted"; mover é mudar "dayId" e
--- "position".
+-- "order" (entre as vizinhas: entre 2 e 3 fica 2,5).
 --
 -- O site vê as alterações ao vivo (Supabase Realtime sobre a tabela de
--- campos); a app pergunta "o que mudou desde a revisão N" enquanto o plano
--- está aberto.
+-- campos). A app recebe um toque sem conteúdo pelo Realtime ("o plano mudou,
+-- revisão N", ver private.poke) e só então pergunta o que mudou.
 --
 -- Só membros da Comunidade criam, aceitam convites e editam. O plano completo
 -- vai para aqui (incluindo casa e ponto de partida, por decisão do dono); o
@@ -96,6 +96,28 @@ begin
 end $$;
 
 /*
+  Um toque para quem tem o plano aberto na app: "o plano mudou, revisão N".
+  Só o número, sem conteúdo nenhum: a app vai depois buscar o que mudou pelo
+  caminho com a chave de ligação, onde as regras de acesso se aplicam. É isto
+  que deixa a app esperar em silêncio em vez de perguntar a cada 2 s.
+  Sem o Realtime (ou se ele falhar) não faz nada: um aviso perdido nunca
+  estraga uma escrita, e a app pergunta na mesma de vez em quando.
+*/
+drop function if exists private.poke(uuid, bigint);
+create or replace function private.poke(p_plan uuid, p_rev bigint, p_event text default 'changed')
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if to_regprocedure('realtime.send(jsonb,text,text,boolean)') is not null then
+    begin
+      execute 'select realtime.send($1, $2, $3, false)'
+        using jsonb_build_object('rev', p_rev), p_event, 'plan-poke:' || p_plan::text;
+    exception when others then
+      null;
+    end;
+  end if;
+end $$;
+
+/*
   Escreve campos de um plano. `p_fields` é uma lista de {"key": …, "value": …};
   value null quer dizer "o campo deixou de existir". Devolve a revisão mais
   alta escrita (ou a atual, se não havia nada para escrever).
@@ -133,6 +155,8 @@ begin
   update public.shared_plans set updated_at = now() where id = p_plan;
   if r = 0 then
     select coalesce(max(rev), 0) into r from public.shared_plan_fields where plan_id = p_plan;
+  else
+    perform private.poke(p_plan, r);
   end if;
   return r;
 end $$;
@@ -247,6 +271,7 @@ returns void language plpgsql security definer set search_path = '' as $$
 declare uid uuid := private.require_user(p_token);
 begin
   if private.plan_role(p_plan, uid) = 'owner' then
+    perform private.poke(p_plan, null, 'ended');
     delete from public.shared_plans where id = p_plan;
   else
     delete from public.shared_plan_members where plan_id = p_plan and user_id = uid;
@@ -297,6 +322,7 @@ declare uid uuid := (select auth.uid());
 begin
   if uid is null then raise exception 'not_signed_in' using errcode = '28000'; end if;
   if private.plan_role(p_plan, uid) = 'owner' then
+    perform private.poke(p_plan, null, 'ended');
     delete from public.shared_plans where id = p_plan;
   else
     delete from public.shared_plan_members where plan_id = p_plan and user_id = uid;
