@@ -3,20 +3,28 @@
 Itinerários partilhados por quem viajou com o [Plan-ish](https://jrafael-rep.github.io/plan-ish-releases/).
 Site estático (GitHub Pages) sobre uma base de dados Supabase.
 
-- **Sem conta**: ver o feed, abrir itinerários, abrir no Plan-ish.
-- **Com conta** (email, sem password): gostar, comentar, gerir telemóveis ligados, apagar a conta.
+- **Sem conta**: ver o feed (procurar por destino ou título, filtrar por GPS verificado / feitas /
+  roteiros, ordenar por mais recentes ou mais gostadas), abrir itinerários, perfis, abrir no Plan-ish.
+- **Com conta** (email, sem password): gostar, comentar e responder, gostar de comentários, gerir
+  telemóveis ligados, apagar a conta.
 - **A app** lê o feed sem conta e, depois de **ligada** a uma conta (confirmado aqui, em `ligar.html`),
-  publica viagens concluídas, comenta e dá likes. A app nunca inicia sessão nem vê passwords.
+  publica viagens concluídas (com orçamento e fotografias, se quiser), comenta e gosta. A app nunca
+  inicia sessão nem vê passwords.
+
+O cartão de uma viagem (`assets/card.js`) é o mesmo no feed, no itinerário e no perfil, e a app
+desenha o mesmo no separador Comunidade. Ver `DESIGN.md`.
 
 ## Páginas
 
 | Página | Para quê |
 |---|---|
-| `index.html` | Feed de itinerários |
-| `itinerario.html?id=…` | Um itinerário: dias, paragens, likes, comentários, denunciar |
+| `index.html` | Explorar: o feed de viagens, com pesquisa, filtros, ordem e "Ver mais viagens" |
+| `itinerario.html?id=…` | Uma viagem: fotografias, dia a dia, quem também a fez, conversa com respostas |
+| `viajante.html?id=…` | Perfil público: estatísticas e grelha das viagens publicadas e feitas |
 | `entrar.html` | Entrar com um link por email |
 | `ligar.html?pedido=…` | Confirmar a ligação da app (só "Entrar" e "Ligar"; sem planos nem preços) |
 | `conta.html` | O teu nome (e quem o escolheu), o nome do próximo viajante, itinerários, telemóveis ligados, sair, apagar conta |
+| `privacidade.html` | O que a Comunidade guarda, o que é público e como se apaga |
 
 ## Configurar (uma vez)
 
