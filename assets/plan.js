@@ -34,7 +34,8 @@ let lastChange = null;
 let flushTimer = null;
 let pollTimer = null;
 let realtimeOk = false;
-const flashes = new Set();
+/** O que outra pessoa acabou de mudar, e até quando se destaca. */
+const flashes = new Map();
 
 const SCHEMA_MISSING = new Set(['42P01', 'PGRST205', 'PGRST202', '42883']);
 
@@ -94,7 +95,7 @@ function receive(rows, remote = true) {
     if (inFlight.has(row.key)) continue;
     fields.set(row.key, row.value);
     if (remote) {
-      flashes.add(row.key);
+      flashes.set(row.key, Date.now() + 1600);
       lastChange = { author: row.author_id, at: row.updated_at ?? new Date().toISOString() };
     }
   }
@@ -210,14 +211,19 @@ function render() {
       if (caret && 'setSelectionRange' in again) { try { again.setSelectionRange(...caret); } catch { /* campos sem cursor */ } }
     }
   }
-  for (const key of flashes) {
+  // O destaque dura o mesmo que a animação, mesmo que a página se redesenhe
+  // entretanto (outra alteração a chegar logo a seguir).
+  const now = Date.now();
+  for (const [key, until] of flashes) {
+    if (until < now) { flashes.delete(key); continue; }
     const [entity, ...rest] = key.split(':');
     const slot = rest.slice(0, -1).join(':');
     const node = document.querySelector(`[data-key="${CSS.escape(key)}"]`)
       ?? document.querySelector(`[data-${entity}="${CSS.escape(slot)}"]`);
-    node?.classList.add('flash');
+    if (!node) continue;
+    node.classList.add('flash');
+    node.style.animationDelay = `${-(1600 - (until - now))}ms`;
   }
-  flashes.clear();
   paintLive();
 }
 

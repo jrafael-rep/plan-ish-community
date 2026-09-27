@@ -70,14 +70,33 @@ export function renumber(stops) {
   return stops.flatMap((s, i) => (s.order === i + 1 ? [] : setField('stop', s.slot, 'order', i + 1)));
 }
 
-/** Troca uma paragem com a do lado (`delta` −1 sobe, +1 desce). */
+/** Um número entre dois vizinhos (qualquer um pode faltar), como na app. */
+export function between(prev, next) {
+  const lo = Number.isFinite(prev?.order) ? prev.order : undefined;
+  const hi = Number.isFinite(next?.order) ? next.order : undefined;
+  if (lo !== undefined && hi !== undefined) return lo < hi ? (lo + hi) / 2 : null;
+  if (lo !== undefined) return lo + 1;
+  if (hi !== undefined) return hi - 1;
+  return 1;
+}
+
+/**
+ * Sobe ou desce uma paragem um lugar (`delta` −1 sobe, +1 desce).
+ *
+ * Só a paragem que se mexe muda de número: fica entre as novas vizinhas. Assim
+ * duas pessoas a reordenar ao mesmo tempo não desfazem o que a outra fez.
+ */
 export function moveWithinDay(day, stopSlot, delta) {
   const list = [...day.stops];
   const i = list.findIndex((s) => s.slot === stopSlot);
   const j = i + delta;
   if (i < 0 || j < 0 || j >= list.length) return [];
-  [list[i], list[j]] = [list[j], list[i]];
-  return renumber(list);
+  const [stop] = list.splice(i, 1);
+  list.splice(j, 0, stop);
+  const order = between(list[j - 1], list[j + 1]);
+  // Vizinhas com o mesmo número (duas paragens postas ao mesmo tempo): não há
+  // espaço entre elas, e aí renumera-se o dia.
+  return order === null ? renumber(list) : setField('stop', stop.slot, 'order', order);
 }
 
 /** Passa uma paragem para o fim de outro dia. */

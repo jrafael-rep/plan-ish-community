@@ -63,12 +63,37 @@ test('apagado não aparece; um dia apagado leva as paragens', () => {
   assert.equal(m.stopCount, 1);
 });
 
-test('subir e descer renumera só o que muda', () => {
-  const m = buildModel(sample());
-  assert.deepEqual(moveWithinDay(m.days[0], 'b', -1), [
-    { key: 'stop:b:order', value: 1 }, { key: 'stop:a:order', value: 2 },
-  ]);
+test('subir e descer muda só o número da paragem que se mexe', () => {
+  const f = sample();
+  f.set('stop:x:name', 'Loja'); f.set('stop:x:dayId', 'd1'); f.set('stop:x:order', 3);
+  const m = buildModel(f);
+  // a(1) b(2) x(3): subir o x põe-no entre a e b.
+  assert.deepEqual(moveWithinDay(m.days[0], 'x', -1), [{ key: 'stop:x:order', value: 1.5 }]);
+  // subir o b para o topo: antes do a.
+  assert.deepEqual(moveWithinDay(m.days[0], 'b', -1), [{ key: 'stop:b:order', value: 0 }]);
+  // descer o b para o fundo: depois do x.
+  assert.deepEqual(moveWithinDay(m.days[0], 'b', 1), [{ key: 'stop:b:order', value: 4 }]);
   assert.deepEqual(moveWithinDay(m.days[0], 'a', -1), []);
+});
+
+test('duas pessoas sobem paragens diferentes ao mesmo tempo: as duas mudanças ficam', () => {
+  const f = sample();
+  f.set('stop:x:name', 'Loja'); f.set('stop:x:dayId', 'd1'); f.set('stop:x:order', 3);
+  const m = buildModel(f);
+  const ana = moveWithinDay(m.days[0], 'x', -1); // x antes de b
+  const rui = moveWithinDay(m.days[0], 'b', -1); // b antes de a
+  for (const c of [...ana, ...rui]) f.set(c.key, c.value);
+  assert.deepEqual(buildModel(f).days[0].stops.map((s) => s.id), ['b', 'a', 'x']);
+});
+
+test('sem espaço entre vizinhas com o mesmo número, renumera o dia', () => {
+  const f = sample();
+  f.set('stop:x:name', 'Loja'); f.set('stop:x:dayId', 'd1'); f.set('stop:x:order', 2);
+  const m = buildModel(f); // a(1) b(2) x(2)
+  const out = moveWithinDay(m.days[0], 'a', 1); // a entre b e x, ambos 2
+  const g = sample(); g.set('stop:x:name', 'Loja'); g.set('stop:x:dayId', 'd1'); g.set('stop:x:order', 2);
+  for (const c of out) g.set(c.key, c.value);
+  assert.deepEqual(buildModel(g).days[0].stops.map((s) => s.id), ['b', 'a', 'x']);
 });
 
 test('mudar de dia vai para o fim do outro dia', () => {
