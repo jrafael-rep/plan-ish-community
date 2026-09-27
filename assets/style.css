@@ -1,25 +1,25 @@
 /* Comunidade Plan-ish — feed social de viagens. Ver DESIGN.md.
-   Paleta "Brisa", a mesma da app (temas "brisa" e "brisa-noite") e da página
-   da app: claro por defeito; escuro com o botão do topo (data-theme="dark",
+   Paleta "Brisa", a mesma da página da app e da família dos temas da app
+   ("brisa" e "brisa-noite"): claro por defeito, em verde-água com cor; escuro com o botão do topo (data-theme="dark",
    guardado em assets/theme.js e partilhado com a página da app). */
 :root {
   color-scheme: light;
-  --bg: #F2F7F8;
-  --surface: #FFFFFF;
-  --surface-2: #E7F1F3;
-  --line: #CFE0E4;
-  --text: #0C1F2A;
-  --muted: #465F6C;
-  --accent: #0A717B;
-  --accent-strong: #075A62;
+  --bg: #D5E7E6;
+  --surface: #F4FAF9;
+  --surface-2: #C7DEDD;
+  --line: #A9C6C5;
+  --text: #0A1D26;
+  --muted: #324C57;
+  --accent: #075F68;
+  --accent-strong: #054950;
   --accent-ink: #FFFFFF;
-  --accent-soft: #DAF1EE;
-  --verified: #0E7A4E;
-  --verified-soft: #DCF3E8;
-  --done: #2F63C4;
-  --done-soft: #E2EAFA;
-  --like: #D6245C;
-  --danger: #B42318;
+  --accent-soft: #C3E6E1;
+  --verified: #0A6A43;
+  --verified-soft: #CDEBDD;
+  --done: #2554A8;
+  --done-soft: #D6E1F5;
+  --like: #B51A4B;
+  --danger: #A61E14;
   --r: 18px;
   --r-sm: 12px;
   --shadow: 0 1px 2px rgba(12, 31, 42, .06), 0 6px 20px -8px rgba(12, 31, 42, .18);
