@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 q() { local role=$1 sub=$2; shift 2
@@ -130,6 +130,41 @@ expect "whoami diz membro" '\|true\|true$' "$(q anon '' "select display_name||'|
 adm "update public.memberships set valid_until = now() - interval '1 day'"
 expect "membro expirado deixa de o ser" '\|false\|false$' "$(q anon '' "select display_name||'|'||member||'|'||can_interact from public.app_whoami('$TOK')")"
 adm "update public.community_settings set members_only = false"
+
+# ---------------------------------------------------------- planos partilhados
+adm "delete from public.memberships; insert into public.memberships(user_id) values ('$A')"
+expect "quem não é membro não partilha" 'members_only' "$(q anon '' "select * from public.app_share_plan('$BTOK','Plano',  'c1', '[]'::jsonb)")"
+SP=$(q anon "" "select plan_id from public.app_share_plan('$TOK','Algarve com amigos','dev-a','[{\"key\":\"trip:trip:name\",\"value\":\"Algarve\"},{\"key\":\"stop:s1:name\",\"value\":\"Sagres\"},{\"key\":\"stop:s1:durationMin\",\"value\":60}]'::jsonb)")
+expect "o membro partilha um plano" '^[0-9a-f-]{36}$' "$SP"
+expect "os campos ficam com revisões" '^3$' "$(q anon '' "select count(*) from public.app_plan_fields_since('$TOK','$SP',0)")"
+expect "quem não está no plano não lê pela app" 'not_in_plan' "$(q anon '' "select * from public.app_plan_fields_since('$BTOK','$SP',0)")"
+expect "quem não está no plano não lê pelo site" '^0$' "$(q authenticated $B "select count(*) from public.shared_plan_fields where plan_id = '$SP'")"
+expect "anon não lê campos" 'permission denied' "$(q anon '' "select count(*) from public.shared_plan_fields")"
+expect "ninguém escreve direto na tabela" 'permission denied' "$(q authenticated $A "insert into public.shared_plan_fields(plan_id,key,value,rev) values ('$SP','stop:x:name','\"x\"',1)")"
+expect "chave de campo inválida recusada" 'fields_invalid' "$(q anon '' "select public.app_write_plan_fields('$TOK','$SP','dev-a','[{\"key\":\"drop table\",\"value\":1}]'::jsonb)")"
+R0=$(q anon "" "select max(rev) from public.app_plan_fields_since('$TOK','$SP',0)")
+CODE=$(q anon "" "select public.app_plan_invite('$TOK','$SP')")
+expect "convite com 12 caracteres" '^[a-z2-9]{12}$' "$CODE"
+expect "não membro não aceita convite" 'members_only' "$(q authenticated $B "select public.accept_plan_invite('$CODE')")"
+adm "insert into public.memberships(user_id) values ('$B')"
+expect "o convite mostra o plano e quem convida" '^Algarve\|' "$(q authenticated $B "select title||'|'||owner_name||'|'||already from public.plan_invite_info('$CODE')")"
+expect "B aceita o convite" "^$SP\$" "$(q authenticated $B "select public.accept_plan_invite('$CODE')")"
+expect "convite inventado recusado" 'invite_invalid' "$(q authenticated $B "select public.accept_plan_invite('zzzzzzzzzzzz')")"
+expect "B vê o plano na app" '^Algarve\|editor\|2$' "$(q anon '' "select title||'|'||role||'|'||member_count from public.app_my_shared_plans('$BTOK')")"
+expect "B, no site, muda a duração" '^[0-9]+$' "$(q authenticated $B "select public.write_plan_fields('$SP','web-b','[{\"key\":\"stop:s1:durationMin\",\"value\":90}]'::jsonb)")"
+expect "A, na app, só recebe o que mudou depois" '^stop:s1:durationMin 90 web-b$' "$(q anon '' "select key||' '||value||' '||client_id from public.app_plan_fields_since('$TOK','$SP',$R0)")"
+q anon "" "select public.app_write_plan_fields('$TOK','$SP','dev-a','[{\"key\":\"stop:s1:name\",\"value\":\"Sagres, o cabo\"}]'::jsonb)" >/dev/null
+q authenticated $B "select public.write_plan_fields('$SP','web-b','[{\"key\":\"stop:s1:name\",\"value\":\"Cabo de São Vicente\"}]'::jsonb)" >/dev/null
+expect "no mesmo campo, fica a última escrita" '^"Cabo de São Vicente"$' "$(q authenticated $A "select value from public.shared_plan_fields where plan_id = '$SP' and key = 'stop:s1:name'")"
+expect "campos diferentes não se estragam" '^90$' "$(q authenticated $A "select value from public.shared_plan_fields where plan_id = '$SP' and key = 'stop:s1:durationMin'")"
+expect "apagar é escrever deleted" '^true$' "$(q anon '' "select public.app_write_plan_fields('$TOK','$SP','dev-a','[{\"key\":\"stop:s1:deleted\",\"value\":true}]'::jsonb)" >/dev/null; q authenticated $B "select value from public.shared_plan_fields where plan_id = '$SP' and key = 'stop:s1:deleted'")"
+expect "mudar o nome da viagem muda o nome do plano" '^Algarve e Alentejo$' "$(q anon '' "select public.app_write_plan_fields('$TOK','$SP','dev-a','[{\"key\":\"trip:trip:name\",\"value\":\"Algarve e Alentejo\"}]'::jsonb)" >/dev/null; q anon '' "select title from public.app_my_shared_plans('$TOK')")"
+expect "a app vê quem está no plano" '^2$' "$(q anon '' "select count(*) from public.app_plan_members('$TOK','$SP')")"
+expect "B sai do plano" '^0$' "$(q authenticated $B "select public.leave_plan('$SP')" >/dev/null; q anon '' "select count(*) from public.app_my_shared_plans('$BTOK')")"
+expect "quem não está no plano não vê os membros" 'not_in_plan' "$(q anon '' "select * from public.app_plan_members('$BTOK','$SP')")"
+expect "B volta a entrar pela app com o código" "^$SP\$" "$(q anon '' "select public.app_accept_plan_invite('$BTOK',upper('$CODE'))")"
+expect "o dono apaga o plano ao sair" '^0$' "$(q anon '' "select public.app_leave_plan('$TOK','$SP')" >/dev/null; adm "select count(*) from public.shared_plans")"
+adm "delete from public.memberships"
 
 adm "update public.itineraries set hidden = true where id = '$IID'"
 expect "escondido some do feed" '^0$' "$(q anon '' "select count(*) from public.itineraries where id = '$IID'")"
