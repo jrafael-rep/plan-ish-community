@@ -61,8 +61,7 @@ export function routeCover(it) {
 }
 
 /** Fotografias a deslizar; sem fotografias, a capa do percurso. */
-function media(it) {
-  const photos = Array.isArray(it.photos) ? it.photos.slice(0, 6) : [];
+function media(it, photos = Array.isArray(it.photos) ? it.photos.slice(0, 6) : []) {
   const facts = el('span', { class: 'media-facts' },
     icon('route'), `${plural(it.day_count, 'dia', 'dias')} · ${plural(it.stop_count, 'paragem', 'paragens')}`);
   if (!photos.length) {
@@ -72,6 +71,8 @@ function media(it) {
   const track = el('div', { class: 'slides', tabindex: '0', 'aria-label': `Fotografias de ${it.title}` },
     ...photos.map((p, i) => el('img', {
       src: photoUrl(p), alt: `Fotografia ${i + 1} de ${photos.length}`, loading: i ? 'lazy' : 'eager', decoding: 'async',
+      // Uma fotografia que não abre sai; sem nenhuma, fica a capa do percurso.
+      onerror: () => box.replaceWith(media(it, photos.filter((x) => x !== p))),
     })));
   const box = el('div', { class: 'media' }, track, el('span', { class: 'media-badge' }, badge(it.evidence)), facts);
   if (photos.length > 1) {
