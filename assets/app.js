@@ -222,6 +222,22 @@ function modeButton() {
   return button;
 }
 
+/** Apaga do Storage as fotos que o servidor pôs no lixo (só essas se deixam apagar). */
+export async function removePhotos(paths) {
+  if (!paths?.length) return;
+  try { await sb.storage.from('itinerary-photos').remove(paths); } catch { /* ficam no lixo; a próxima limpeza leva-as */ }
+}
+
+/** Retira da Comunidade um itinerário meu, com as fotos. Devolve o erro, se houver. */
+export async function withdrawItinerary(id) {
+  const { data, error } = await sb.rpc('withdraw_itinerary', { p_itinerary_id: id });
+  if (error) return error;
+  await removePhotos(data);
+  return null;
+}
+
+export const WITHDRAW_WARNING = 'O itinerário, as fotografias, os gostos, as avaliações e os comentários são apagados. A viagem na app fica no telemóvel.';
+
 /** O cabeçalho igual em todas as páginas. */
 export async function header(current) {
   const session = await currentSession();

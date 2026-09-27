@@ -111,6 +111,7 @@ nav a[aria-current="page"] { color: var(--text); background: var(--surface-2); }
 .btn.danger { color: var(--danger); }
 .btn.quiet { border-color: transparent; background: transparent; color: var(--muted); min-height: 40px; padding: 0 .7rem; }
 .btn.quiet:hover { background: var(--surface-2); color: var(--text); }
+.btn.quiet.danger, .btn.quiet.danger:hover { color: var(--danger); }
 .btn[disabled] { opacity: .5; cursor: default; }
 .btn svg { width: 19px; height: 19px; }
 .row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
@@ -436,3 +437,11 @@ dialog.terms-dialog h2 { margin-bottom: .6rem; }
 .mod-item .excerpt { margin: .35rem 0; padding: .5rem .7rem; background: var(--surface-2); border-radius: var(--r-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
 .mod-item .state { font-size: .8rem; font-weight: 800; color: var(--muted); }
 .mod-item.resolved { opacity: .7; }
+
+/* ---------------------------------------------- o que é meu: retirar */
+.owner-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem;
+  margin: 0 0 .75rem; padding: .75rem 1rem; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); }
+.mine-row { display: flex; align-items: center; gap: .75rem; }
+.mine-row > a { flex: 1; min-width: 0; color: inherit; text-decoration: none; }
+.mine-row > a strong { margin-right: .4rem; }
+.chip.warn { font-size: .75rem; font-weight: 800; padding: .1rem .55rem; border-radius: 999px; color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); white-space: nowrap; }

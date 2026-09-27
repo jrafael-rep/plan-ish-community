@@ -1,5 +1,6 @@
 import {
-  $, acceptCurrentTerms, avatar, badge, el, explain, header, monthLabel, notice, relativeDay, sb, show, signInLink,
+  $, acceptCurrentTerms, avatar, badge, el, explain, header, monthLabel, notice, plural, relativeDay, removePhotos, sb, show,
+  signInLink, starText, withdrawItinerary, WITHDRAW_WARNING,
 } from './app.js';
 
 const session = await header('conta');
@@ -9,21 +10,18 @@ else await load();
 
 async function load() {
   $('email').textContent = `Entraste como ${session.user.email}`;
-  const [{ data: profile }, { data: membership }, { data: mine }] = await Promise.all([
+  const [{ data: profile }, { data: membership }] = await Promise.all([
     sb.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle(),
     sb.from('memberships').select('tier, valid_until').maybeSingle(),
-    sb.from('itineraries').select('id, title, travelled_month, hidden, evidence').eq('author_id', session.user.id).order('created_at', { ascending: false }),
   ]);
   $('name').replaceChildren(avatar(profile?.display_name, 'lg'), el('span', {}, profile?.display_name ?? ''));
   $('public-profile').href = `viajante.html?id=${encodeURIComponent(session.user.id)}`;
   await loadNextName();
   const active = membership && (!membership.valid_until || new Date(membership.valid_until) > new Date());
   $('membership').textContent = active ? 'Membro da Comunidade.' : 'Conta da Comunidade.';
-  $('mine').replaceChildren(...(mine?.length ? mine.map((it) => el('a', { class: 'card mini', href: `itinerario.html?id=${encodeURIComponent(it.id)}` },
-    el('span', {}, el('strong', {}, it.title), it.hidden ? el('span', { class: 'muted small' }, ' · escondido pela moderação') : null,
-      it.travelled_month ? el('span', { class: 'muted small block' }, monthLabel(it.travelled_month)) : null),
-    badge(it.evidence ?? 'plan'),
-  )) : [el('p', { class: 'muted' }, 'Ainda não publicaste nenhum. Publica-se a partir da app, numa viagem concluída.')]));
+  await loadMine();
+  // Fotos de algo retirado antes, que não chegaram a sair do Storage.
+  sb.rpc('my_photo_trash').then(({ data }) => removePhotos(data), () => {});
   await loadShared();
   await loadTerms();
   await loadBlocks();
@@ -32,6 +30,44 @@ async function load() {
   await loadLinks();
   show($('account'), true);
   if (location.hash === '#planos') $('planos').scrollIntoView();
+  if (location.hash === '#meus') $('meus').scrollIntoView();
+}
+
+/** Os meus itinerários: o que têm, se a moderação os escondeu, e retirar. */
+async function loadMine() {
+  let { data: mine, error } = await sb.rpc('my_published');
+  // Sem o esquema 8, a lista simples de antes.
+  if (error) {
+    ({ data: mine } = await sb.from('itineraries').select('id, title, travelled_month, hidden, evidence')
+      .eq('author_id', session.user.id).order('created_at', { ascending: false }));
+  }
+  const box = $('mine');
+  if (!mine?.length) {
+    box.replaceChildren(el('p', { class: 'muted' }, 'Ainda não publicaste nenhum. Publica-se a partir da app, numa viagem concluída.'));
+    return;
+  }
+  box.replaceChildren(...mine.map((it) => {
+    const facts = [
+      plural(it.like_count ?? 0, 'gosto', 'gostos'),
+      plural(it.comment_count ?? 0, 'comentário', 'comentários'),
+      it.rating_count ? `★ ${starText(it.verified_rating_count ? it.verified_rating_avg : it.rating_avg)} (${it.rating_count})` : null,
+      it.updated_at ? `mudado ${relativeDay(it.updated_at)}` : null,
+    ].filter(Boolean).join(' · ');
+    const withdraw = el('button', { class: 'btn quiet danger', type: 'button' }, 'Retirar');
+    withdraw.addEventListener('click', async () => {
+      if (!confirm(`Retirar “${it.title}” da Comunidade? ${WITHDRAW_WARNING}`)) return;
+      withdraw.disabled = true;
+      const err = await withdrawItinerary(it.id);
+      if (err) { withdraw.disabled = false; notice(status, explain(err), 'error'); return; }
+      await loadMine();
+    });
+    return el('div', { class: 'card mini mine-row' },
+      el('a', { href: `itinerario.html?id=${encodeURIComponent(it.id)}` },
+        el('strong', {}, it.title),
+        it.hidden ? el('span', { class: 'chip warn' }, 'Escondido pela moderação') : null,
+        el('span', { class: 'muted small block' }, facts || (it.travelled_month ? monthLabel(it.travelled_month) : ''))),
+      withdraw);
+  }));
 }
 
 async function loadShared() {
@@ -126,6 +162,9 @@ async function loadNextName() {
 $('signout').addEventListener('click', async () => { await sb.auth.signOut(); location.href = './'; });
 $('delete').addEventListener('click', async () => {
   if (!confirm('Apagar a conta, os itinerários publicados, as avaliações, os comentários e os gostos? Isto não se desfaz.')) return;
+  // Primeiro os itinerários, para as fotos saírem do Storage enquanto há sessão.
+  const { data: photos, error: withdrawError } = await sb.rpc('withdraw_all_mine');
+  if (!withdrawError) await removePhotos(photos);
   const { error } = await sb.rpc('delete_my_account');
   if (error) { notice(status, explain(error), 'error'); return; }
   await sb.auth.signOut();

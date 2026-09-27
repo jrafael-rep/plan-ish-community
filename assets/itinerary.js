@@ -1,6 +1,6 @@
 import {
   $, blockedSet, blockUser, el, explain, header, icon, notice, plural, relativeDay, sb, show, signInLink, starRow, starText,
-  who, withTerms,
+  who, withdrawItinerary, withTerms, WITHDRAW_WARNING,
 } from './app.js';
 import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, RATING_INFO, tripCard } from './card.js';
 
@@ -362,6 +362,24 @@ async function block(userId, name) {
   if (await blockUser(session, userId, name)) location.reload();
 }
 
+/** Para quem publicou: dizer que é seu e deixar retirá-lo daqui. */
+function ownerBar(it) {
+  const bar = $('owner');
+  const withdraw = el('button', { class: 'btn quiet danger', type: 'button' }, 'Retirar da Comunidade');
+  withdraw.addEventListener('click', async () => {
+    if (!confirm(`Retirar “${it.title}” da Comunidade? ${WITHDRAW_WARNING}`)) return;
+    withdraw.disabled = true;
+    const err = await withdrawItinerary(it.id);
+    if (err) { withdraw.disabled = false; alert(explain(err)); return; }
+    location.replace('conta.html#meus');
+  });
+  bar.replaceChildren(
+    el('span', {}, el('strong', {}, 'Publicaste este itinerário.'), ' ', el('span', { class: 'muted' }, 'Para o mudar, atualiza-o na app.')),
+    withdraw,
+  );
+  show(bar, true);
+}
+
 async function report(target, what) {
   const reason = prompt(`O que se passa com ${what}? (conteúdo ofensivo, spam, dados pessoais de alguém…)`);
   if (!reason || !reason.trim()) return;
@@ -378,6 +396,7 @@ if (error || !it) {
   const liked = await likedSet(session, [it.id]);
   $('card').replaceChildren(tripCard(it, { session, liked: liked.has(it.id), open: true, page: true }));
   show($('itinerary'), true);
+  if (me && it.author_id === me) ownerBar(it);
   $('report').replaceChildren(icon('flag'), 'Denunciar este itinerário');
   $('report').addEventListener('click', () => void report({ itinerary_id: it.id }, 'este itinerário'));
   await loadDoneBy(it);
