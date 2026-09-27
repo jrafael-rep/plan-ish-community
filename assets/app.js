@@ -105,6 +105,8 @@ const ICONS = {
   star: '<path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8L12 3.5Z"/>',
   info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5"/><circle cx="12" cy="8" r=".6" fill="currentColor"/>',
   block: '<circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/>',
+  moon: '<path d="M19.5 14.2A7.8 7.8 0 1 1 9.8 4.5a6.3 6.3 0 0 0 9.7 9.7Z"/>',
+  sun: '<circle cx="12" cy="12" r="3.8"/><path d="M12 3v2M12 19v2M5.6 5.6 7 7M17 17l1.4 1.4M3 12h2M19 12h2M5.6 18.4 7 17M17 7l1.4-1.4"/>',
   users: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.6a3.2 3.2 0 0 1 0 6M17.5 14a5.5 5.5 0 0 1 3 5"/>',
 };
 
@@ -198,6 +200,28 @@ const MARK = `<svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
   <path d="M12.5 21.5h5a3.5 3.5 0 0 0 0-7h-3a3.5 3.5 0 0 1 0-7h5" fill="none" stroke="var(--accent-ink)" stroke-width="2.2" stroke-linecap="round"/>
 </svg>`;
 
+/**
+ * Claro ⇄ escuro. Claro por defeito; a escolha fica guardada e vale também na
+ * página da app (assets/theme.js aplica-a antes de a página se desenhar).
+ */
+function modeButton() {
+  const root = document.documentElement;
+  const button = el('button', { class: 'mode', type: 'button', 'aria-label': 'Modo escuro', title: 'Modo escuro' });
+  const show = () => {
+    const dark = root.dataset.theme === 'dark';
+    button.setAttribute('aria-pressed', String(dark));
+    button.replaceChildren(icon(dark ? 'sun' : 'moon'));
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0E1B26' : '#F2F7F8');
+  };
+  button.addEventListener('click', () => {
+    if (root.dataset.theme === 'dark') delete root.dataset.theme; else root.dataset.theme = 'dark';
+    try { localStorage.setItem('planish-theme', root.dataset.theme === 'dark' ? 'dark' : 'light'); } catch { /* fica só nesta página */ }
+    show();
+  });
+  show();
+  return button;
+}
+
 /** O cabeçalho igual em todas as páginas. */
 export async function header(current) {
   const session = await currentSession();
@@ -211,6 +235,7 @@ export async function header(current) {
       el('nav', { 'aria-label': 'Principal' },
         link('./', 'Explorar', 'feed'),
         session ? link('conta.html', 'Conta', 'conta') : link(signInLink(), 'Entrar', 'entrar'),
+        modeButton(),
       ),
     ),
   );

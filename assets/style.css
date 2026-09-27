@@ -1,17 +1,19 @@
 /* Comunidade Plan-ish — feed social de viagens. Ver DESIGN.md.
-   As cores escuras são as do tema Oceano da app; as claras, a mesma família. */
+   Paleta "Brisa", a mesma da app (temas "brisa" e "brisa-noite") e da página
+   da app: claro por defeito; escuro com o botão do topo (data-theme="dark",
+   guardado em assets/theme.js e partilhado com a página da app). */
 :root {
-  color-scheme: light dark;
-  --bg: #F2F5F8;
+  color-scheme: light;
+  --bg: #F2F7F8;
   --surface: #FFFFFF;
-  --surface-2: #EDF2F6;
-  --line: #DCE4EC;
-  --text: #0C1B2A;
-  --muted: #4A5F72;
-  --accent: #0B7A84;
-  --accent-strong: #08636B;
+  --surface-2: #E7F1F3;
+  --line: #CFE0E4;
+  --text: #0C1F2A;
+  --muted: #465F6C;
+  --accent: #0A717B;
+  --accent-strong: #075A62;
   --accent-ink: #FFFFFF;
-  --accent-soft: #DDF1F2;
+  --accent-soft: #DAF1EE;
   --verified: #0E7A4E;
   --verified-soft: #DCF3E8;
   --done: #2F63C4;
@@ -20,30 +22,29 @@
   --danger: #B42318;
   --r: 18px;
   --r-sm: 12px;
-  --shadow: 0 1px 2px rgba(12, 27, 42, .06), 0 6px 20px -8px rgba(12, 27, 42, .18);
+  --shadow: 0 1px 2px rgba(12, 31, 42, .06), 0 6px 20px -8px rgba(12, 31, 42, .18);
   --ease: cubic-bezier(.2, .8, .2, 1);
   --font: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0A1420;
-    --surface: #12202F;
-    --surface-2: #1A2C3F;
-    --line: #27405A;
-    --text: #EAF3FA;
-    --muted: #9FB6C9;
-    --accent: #3FD0D8;
-    --accent-strong: #6ADDE3;
-    --accent-ink: #061818;
-    --accent-soft: #12383F;
-    --verified: #3DDC97;
-    --verified-soft: #10362A;
-    --done: #7FB6FF;
-    --done-soft: #1A2F4F;
-    --like: #FF6B8B;
-    --danger: #FF7A7A;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 28px -12px rgba(0, 0, 0, .55);
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0E1B26;
+  --surface: #152634;
+  --surface-2: #1D3242;
+  --line: #2B4659;
+  --text: #EAF3F8;
+  --muted: #A2B9C8;
+  --accent: #45D1D0;
+  --accent-strong: #74DEDD;
+  --accent-ink: #04191A;
+  --accent-soft: #143E45;
+  --verified: #3DDC97;
+  --verified-soft: #12392E;
+  --done: #85B9FF;
+  --done-soft: #1B3352;
+  --like: #FF7A95;
+  --danger: #FF7E7E;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 28px -12px rgba(0, 0, 0, .55);
 }
 
 * { box-sizing: border-box; }
@@ -80,7 +81,7 @@ header.top .wrap { display: flex; align-items: center; gap: .75rem; min-height: 
 .brand .mark { width: 32px; height: 32px; flex: none; }
 .brand b { font-weight: 800; font-size: 1.1rem; letter-spacing: -.02em; }
 .brand span { color: var(--muted); font-weight: 600; }
-nav { margin-left: auto; display: flex; gap: .25rem; }
+nav { margin-left: auto; display: flex; align-items: center; gap: .25rem; }
 nav a {
   color: var(--muted); text-decoration: none; font-weight: 700; padding: 0 .9rem; border-radius: 999px;
   min-height: 42px; display: inline-flex; align-items: center;
@@ -88,6 +89,13 @@ nav a {
 nav a:hover { color: var(--text); background: var(--surface-2); }
 nav a[aria-current="page"] { color: var(--text); background: var(--surface-2); }
 @media (max-width: 420px) { .brand span { display: none; } }
+.mode {
+  display: grid; place-items: center; width: 42px; height: 42px; flex: none; padding: 0;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); cursor: pointer;
+  transition: background-color .2s var(--ease), transform .2s var(--ease);
+}
+.mode:hover { background: var(--surface-2); }
+.mode:active { transform: scale(.94); }
 
 /* ------------------------------------------------------------- botões */
 .btn {
