@@ -205,7 +205,8 @@ export async function header(current) {
   document.body.append(el('footer', {}, el('div', { class: 'wrap' },
     'Viagens de quem viajou com o Plan-ish. ',
     el('strong', {}, 'GPS verificado'), ' quer dizer que o GPS do telemóvel confirmou a maior parte das paragens. ',
-    el('a', { href: 'https://jrafael-rep.github.io/plan-ish-releases/' }, 'Sobre a app'),
+    el('a', { href: 'https://jrafael-rep.github.io/plan-ish-releases/' }, 'Sobre a app'), ' · ',
+    el('a', { href: 'privacidade.html' }, 'Privacidade'),
   )));
   return session;
 }

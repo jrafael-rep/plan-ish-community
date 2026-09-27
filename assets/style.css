@@ -327,6 +327,9 @@ a.card:hover { color: inherit; background: var(--surface-2); }
 section h2 { margin-top: 1.75rem; margin-bottom: .6rem; }
 .panel h2, .profile-head h2 { margin-top: 0; }
 
+.prose h2 { margin: 1.6rem 0 .5rem; }
+.prose ul { padding-left: 1.2rem; }
+.prose li { margin: .35rem 0; }
 footer { border-top: 1px solid var(--line); padding: 1.5rem 0 3rem; color: var(--muted); font-size: .88rem; }
 footer .wrap { max-width: 38rem; }
 footer a { color: var(--muted); }
