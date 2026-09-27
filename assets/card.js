@@ -1,12 +1,13 @@
 // O cartão de uma viagem: igual no feed, na página do itinerário e no perfil.
 // A app desenha o mesmo cartão no separador Comunidade.
 import {
-  appScheme, badge, budgetText, el, explain, hue, icon, monthLabel, plural, photoUrl, relativeDay, sb, signInLink, who,
+  appScheme, badge, budgetText, el, explain, hue, icon, monthLabel, plural, photoUrl, relativeDay, sb, signInLink, starText, who,
 } from './app.js';
 
 export const CARD_COLUMNS = 'id, title, destination, summary, day_count, stop_count, travelled_month, like_count, comment_count, '
   + 'created_at, evidence, visited_stops, gps_stops, done_count, original_done_count, budget_min, budget_max, photos, plan, '
-  + 'author_id, author:profiles!itineraries_author_id_fkey(display_name)';
+  + 'author_id, author:profiles!itineraries_author_id_fkey(display_name), '
+  + 'review_count, rating_count, rating_avg, verified_rating_count, verified_rating_avg';
 
 /**
  * Enquanto os esquemas 3 e 4 não correm na base de dados, as colunas novas
@@ -83,6 +84,8 @@ function media(it, photos = Array.isArray(it.photos) ? it.photos.slice(0, 6) : [
   const track = el('div', { class: 'slides', tabindex: '0', 'aria-label': `Fotografias de ${it.title}` },
     ...photos.map((p, i) => el('img', {
       src: photoUrl(p), alt: `Fotografia ${i + 1} de ${photos.length}`, loading: i ? 'lazy' : 'eager', decoding: 'async',
+      // As fotografias saem da app com 1280 px no lado maior, em 4:3: o espaço fica reservado antes de chegarem.
+      width: 1280, height: 960,
       // Uma fotografia que não abre sai; sem nenhuma, fica a capa do percurso.
       onerror: () => box.replaceWith(media(it, photos.filter((x) => x !== p))),
     })));
@@ -131,6 +134,42 @@ function evidenceNote(it) {
   return 'Um plano: a viagem não foi registada pelo telemóvel.';
 }
 
+export const RATING_INFO = 'A estrela em destaque conta só quem fez esta viagem com o GPS a confirmar. O número mais pequeno conta todas as avaliações.';
+
+/**
+ * As estrelas de um itinerário. Em destaque, só as de quem o fez com o GPS a
+ * confirmar; ao lado, mais pequenas, as de toda a gente, com um ⓘ.
+ */
+export function ratingFacts(it) {
+  const out = [];
+  const vAvg = Number(it.verified_rating_avg);
+  const aAvg = Number(it.rating_avg);
+  const verified = it.verified_rating_count > 0 && Number.isFinite(vAvg);
+  if (verified) {
+    out.push(el('span', {
+      class: 'fact gps rating', 'aria-label': `${starText(vAvg)} estrelas, de ${plural(it.verified_rating_count, 'pessoa que fez', 'pessoas que fizeram')} a viagem`,
+    }, icon('star'), `${starText(vAvg)} (${it.verified_rating_count})`));
+  }
+  if (it.rating_count > 0 && Number.isFinite(aAvg)) {
+    out.push(el('span', { class: 'rating-all' },
+      el('span', { 'aria-label': `${starText(aAvg)} estrelas, a contar com ${plural(it.rating_count, 'avaliação', 'avaliações')}` },
+        verified ? `(${starText(aAvg)} · ${it.rating_count})` : `★ ${starText(aAvg)} · ${it.rating_count}`),
+      el('button', { class: 'info', type: 'button', title: RATING_INFO, 'aria-label': RATING_INFO, onclick: (e) => alertInfo(e) }, icon('info'))));
+  }
+  return out;
+}
+
+/** Num ecrã tátil não há "title" ao passar o rato: o ⓘ diz a nota ao tocar. */
+function alertInfo(e) {
+  e.preventDefault();
+  alert(RATING_INFO);
+}
+
+/** Avaliações e comentários juntos: o número ao lado do balão. */
+export function talkCount(it) {
+  return (it.review_count ?? 0) + (it.comment_count ?? 0);
+}
+
 /** O botão de gostar, que funciona com sessão no site. */
 export function likeButton(it, session, liked, hint) {
   let on = liked;
@@ -175,7 +214,7 @@ export function tripCard(it, { session = null, liked = false, open = false, page
     dayList(it.plan),
     el('div', { class: 'more-actions' },
       el('a', { class: 'btn primary', href: `${appScheme()}://itinerary/${encodeURIComponent(it.id)}` }, 'Abrir no Plan-ish'),
-      page ? null : el('a', { class: 'btn', href: `${href}#conversa` }, icon('chat'), it.comment_count ? `Conversa (${it.comment_count})` : 'Conversa')),
+      page ? null : el('a', { class: 'btn', href: `${href}#avaliacoes` }, icon('chat'), talkCount(it) ? `Avaliações e conversa (${talkCount(it)})` : 'Avaliar ou comentar')),
     page ? el('p', { class: 'small muted' }, 'Abre a app no telemóvel, onde podes copiar este itinerário para o teu planeamento. Ainda não a tens? ',
       el('a', { href: 'https://jrafael-rep.github.io/plan-ish-releases/' }, 'Conhece o Plan-ish'), '.') : null,
   );
@@ -200,8 +239,9 @@ export function tripCard(it, { session = null, liked = false, open = false, page
       el('p', { class: 'trip-meta' },
         ...[it.destination ? el('span', { class: 'i' }, icon('pin'), it.destination) : null,
           it.travelled_month ? el('span', { class: 'i' }, icon('calendar'), monthLabel(it.travelled_month)) : null].filter(Boolean)),
-      budget || it.done_count
+      budget || it.done_count || it.rating_count
         ? el('div', { class: 'facts' },
+          ...ratingFacts(it),
           budget ? el('span', { class: 'fact' }, icon('wallet'), budget) : null,
           it.done_count ? el('span', { class: `fact${it.original_done_count ? ' gps' : ''}` }, icon('users'),
             it.original_done_count
@@ -211,8 +251,8 @@ export function tripCard(it, { session = null, liked = false, open = false, page
       it.summary ? el('p', { class: `summary${page ? '' : ' clamp'}` }, it.summary) : null),
     el('div', { class: 'actions' },
       likeButton(it, session, liked, hint),
-      el('a', { class: 'act', href: page ? '#conversa' : `${href}#conversa`, 'aria-label': `Conversa, ${plural(it.comment_count, 'comentário', 'comentários')}` },
-        icon('chat'), el('span', {}, String(it.comment_count))),
+      el('a', { class: 'act', href: page ? '#avaliacoes' : `${href}#avaliacoes`, 'aria-label': `Avaliações e conversa, ${talkCount(it)}` },
+        icon('chat'), el('span', {}, String(talkCount(it)))),
       el('button', { class: 'act', type: 'button', 'aria-label': 'Partilhar', onclick: () => void share(it, hint) }, icon('share')),
       page ? null : toggle),
     hint,

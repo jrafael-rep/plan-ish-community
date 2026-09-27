@@ -5,11 +5,16 @@ Site estático (GitHub Pages) sobre uma base de dados Supabase.
 
 - **Sem conta**: ver o feed (procurar por destino ou título, filtrar por GPS verificado / feitas /
   roteiros, ordenar por mais recentes ou mais gostadas), abrir itinerários, perfis, abrir no Plan-ish.
-- **Com conta** (email, sem password): gostar, comentar e responder, gostar de comentários, gerir
-  telemóveis ligados, apagar a conta.
+- **Com conta** (email, sem password): gostar, avaliar (estrelas e comentário), comentar e responder,
+  gostar de comentários, bloquear pessoas, gerir telemóveis ligados, apagar a conta. Publicar,
+  avaliar e comentar pedem os [termos de utilização](termos.html).
 - **A app** lê o feed sem conta e, depois de **ligada** a uma conta (confirmado aqui, em `ligar.html`),
-  publica viagens concluídas (com orçamento e fotografias, se quiser), comenta e gosta. A app nunca
-  inicia sessão nem vê passwords.
+  publica viagens concluídas (com orçamento e fotografias, se quiser), gosta e avalia. Do que os
+  outros escreveram, a app mostra só números; a conversa lê-se aqui. A app nunca inicia sessão
+  nem vê passwords.
+- **Avaliações**: uma por conta e itinerário. As de quem fez a viagem com o GPS a confirmar
+  aparecem em destaque e contam para a estrela grande; as outras vêm à parte e contam só para a
+  média pequena, com um ⓘ.
 - **Planos partilhados** (só membros): um plano editado por várias pessoas ao mesmo tempo, na app e
   aqui (`plano.html`). As alterações vão campo a campo; no mesmo campo, fica a última. O site vê-as
   ao vivo (Supabase Realtime) e mostra quem está na página; a app recebe um toque sem conteúdo pelo
@@ -23,21 +28,24 @@ desenha o mesmo no separador Comunidade. Ver `DESIGN.md`.
 | Página | Para quê |
 |---|---|
 | `index.html` | Explorar: o feed de viagens, com pesquisa, filtros, ordem e "Ver mais viagens" |
-| `itinerario.html?id=…` | Uma viagem: fotografias, dia a dia, quem também a fez, conversa com respostas |
+| `itinerario.html?id=…` | Uma viagem: fotografias, dia a dia, quem também a fez, avaliações (de quem fez e outras), conversa com respostas |
 | `viajante.html?id=…` | Perfil público: estatísticas e grelha das viagens publicadas e feitas |
 | `entrar.html` | Entrar com um link por email |
 | `ligar.html?pedido=…` | Confirmar a ligação da app (só "Entrar" e "Ligar"; sem planos nem preços) |
 | `plano.html?id=…` | Editar um plano partilhado ao vivo: dias, paragens, durações, horas, notas; quem está na página; convidar; sair |
 | `convite.html?c=…` | Aceitar um convite para um plano partilhado (ou abri-lo na app) |
-| `conta.html` | O teu nome (e quem o escolheu), o nome do próximo viajante, itinerários, telemóveis ligados, sair, apagar conta |
+| `conta.html` | O teu nome (e quem o escolheu), o nome do próximo viajante, itinerários, termos, pessoas bloqueadas, telemóveis ligados, sair, apagar conta |
 | `privacidade.html` | O que a Comunidade guarda, o que é público e como se apaga |
+| `termos.html` | Termos de utilização (a versão em vigor está em `community_settings.terms_version`) |
+| `moderacao.html` | Só para quem está em `private.admins`: denúncias, esconder, bloquear contas |
 
 ## Configurar (uma vez)
 
 1. **Base de dados**: no Supabase, *SQL Editor* → colar `supabase/001_community.sql` → *Run*;
    depois `supabase/002_names.sql`, `supabase/003_originals_and_replies.sql`,
-   `supabase/004_budget_and_photos.sql`, `supabase/005_shared_plans.sql` e
-   `supabase/006_private_rls.sql`, por esta ordem. (Na base de dados da Comunidade já estão os seis.) Podem correr outra vez sem estragar nada.
+   `supabase/004_budget_and_photos.sql`, `supabase/005_shared_plans.sql`,
+   `supabase/006_private_rls.sql` e `supabase/007_reviews_terms_moderation.sql`, por esta ordem.
+   (Na base de dados da Comunidade já estão os sete.) Podem correr outra vez sem estragar nada.
    O 004 cria no Storage o bucket público `itinerary-photos` (fotografias até 700 KB, só JPEG).
    O 005 junta a tabela dos planos partilhados à publicação `supabase_realtime`; confirmar em
    *Database → Publications* que ela lá está (sem ela, o site pergunta a cada 3 s em vez de ao vivo).
@@ -77,9 +85,13 @@ experimentar, as duas pessoas precisam da linha em `memberships` acima.
 
 ## Moderação
 
-- Denúncias: tabela `reports` (painel do Supabase).
-- Esconder um itinerário: `update public.itineraries set hidden = true where id = '…';`
-- Esconder um comentário: `update public.comments set hidden = true where id = '…';`
+- Em `moderacao.html`, para quem está em `private.admins`
+  (`insert into private.admins(user_id) values ('…');` no SQL Editor): as denúncias com o que foi
+  denunciado ao lado; esconder ou voltar a mostrar itinerários, avaliações e comentários; ignorar
+  uma denúncia; bloquear uma conta (deixa de publicar, avaliar, comentar e gostar, e o que publicou
+  fica escondido). Tudo verificado no servidor, não só na página.
+- Mudar os termos: publicar a versão nova em `termos.html` e
+  `update public.community_settings set terms_version = 'AAAA-MM-DD';` — toda a gente volta a aceitar.
 
 ## Segurança
 

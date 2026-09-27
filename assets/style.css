@@ -380,3 +380,51 @@ details textarea { margin-top: .35rem; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* ------------------------------------------------ toque, estrelas, avaliações */
+
+a, button, input, select, textarea, label, summary { touch-action: manipulation; }
+.fact.rating svg { fill: currentColor; }
+.rating-all { display: inline-flex; align-items: center; gap: .15rem; color: var(--muted); font-size: .88rem; font-weight: 600; }
+.info { display: inline-grid; place-items: center; min-width: 36px; min-height: 36px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 999px; }
+.info:hover { color: var(--text); background: var(--surface-2); }
+.info svg { width: 17px; height: 17px; }
+.stars { display: inline-flex; gap: 1px; color: var(--muted); }
+.stars svg { width: 16px; height: 16px; }
+.stars svg.on { fill: var(--accent); color: var(--accent); }
+.verified .stars svg.on { fill: var(--verified); color: var(--verified); }
+
+.score { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem .9rem; margin-bottom: .75rem; }
+.score .big { font-size: 2rem; font-weight: 800; color: var(--verified); font-variant-numeric: tabular-nums; }
+.score .big svg { display: inline; width: 26px; height: 26px; fill: currentColor; vertical-align: -3px; margin-right: .2rem; }
+.score .who { color: var(--muted); }
+.review-group { margin-top: 1rem; }
+.review-group > h3 { font-size: 1rem; font-weight: 750; margin-bottom: .4rem; display: flex; align-items: center; gap: .4rem; }
+.review { padding: .8rem 0; border-top: 1px solid var(--line); }
+.review .head { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.review .head .avatar { width: 30px; height: 30px; font-size: .7rem; }
+.review .when { color: var(--muted); font-size: .85rem; }
+.review .body { margin: .4rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review .tools, .comment .tools { display: flex; gap: .25rem; flex-wrap: wrap; margin-top: .3rem; }
+.chip.made { font-size: .75rem; font-weight: 800; padding: .1rem .55rem; border-radius: 999px; background: var(--verified-soft); color: var(--verified); display: inline-flex; gap: .25rem; align-items: center; }
+.chip.made svg { width: 14px; height: 14px; }
+
+.star-input { display: flex; gap: .15rem; border: 0; padding: 0; margin: 0 0 .5rem; }
+.star-input legend { font-weight: 700; margin-bottom: .3rem; }
+.star-input label { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; cursor: pointer; color: var(--muted); border-radius: 12px; }
+.star-input label:hover { background: var(--surface-2); }
+.star-input input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.star-input input:focus-visible + svg { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.star-input svg { width: 30px; height: 30px; }
+.star-input label.on svg { fill: var(--accent); color: var(--accent); }
+.my-review textarea { width: 100%; }
+
+dialog.terms-dialog { max-width: min(92vw, 30rem); border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--text); padding: 1.2rem 1.2rem 1rem; box-shadow: var(--shadow); overscroll-behavior: contain; }
+dialog.terms-dialog::backdrop { background: rgba(6, 16, 26, .55); }
+dialog.terms-dialog h2 { margin-bottom: .6rem; }
+
+/* Moderação */
+.mod-item { padding: .9rem 0; border-top: 1px solid var(--line); }
+.mod-item .excerpt { margin: .35rem 0; padding: .5rem .7rem; background: var(--surface-2); border-radius: var(--r-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
+.mod-item .state { font-size: .8rem; font-weight: 800; color: var(--muted); }
+.mod-item.resolved { opacity: .7; }

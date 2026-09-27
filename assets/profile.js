@@ -89,7 +89,7 @@ async function render(p) {
 /** Um quadrado da grelha: a primeira fotografia, ou a capa do percurso. */
 function tile(it, doneAs) {
   const cover = it.photos?.length
-    ? el('img', { src: photoUrl(it.photos[0]), alt: '', loading: 'lazy', decoding: 'async' })
+    ? el('img', { src: photoUrl(it.photos[0]), alt: '', loading: 'lazy', decoding: 'async', width: 1280, height: 960 })
     : routeCover(it);
   return el('a', { class: 'tile', href: `itinerario.html?id=${encodeURIComponent(it.id)}` },
     cover,

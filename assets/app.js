@@ -44,6 +44,13 @@ export function explain(error) {
   if (/not_in_plan/.test(text)) return 'Este plano não está partilhado contigo.';
   if (/invite_invalid/.test(text)) return 'Este convite expirou ou não existe. Pede um novo a quem te convidou.';
   if (/fields_invalid/.test(text)) return 'Uma alteração não foi aceite. Recarrega a página e tenta outra vez.';
+  if (/terms_required/.test(text)) return 'Para publicar, comentar ou avaliar, aceita primeiro os termos de utilização.';
+  if (/terms_outdated/.test(text)) return 'Os termos mudaram entretanto. Lê a versão nova e aceita outra vez.';
+  if (/account_blocked/.test(text)) return 'Esta conta foi bloqueada na Comunidade por não cumprir os termos de utilização.';
+  if (/review_empty/.test(text)) return 'Dá estrelas, escreve um comentário, ou as duas coisas.';
+  if (/review_invalid/.test(text)) return 'As estrelas vão de 1 a 5, e o comentário tem no máximo 2000 caracteres.';
+  if (/own_itinerary/.test(text)) return 'Este itinerário é teu: não se avalia o próprio itinerário.';
+  if (/not_admin/.test(text)) return 'Só para quem modera a Comunidade.';
   if (/not_signed_in|JWT/.test(text)) return 'Entra na tua conta primeiro.';
   if (/Failed to fetch|NetworkError/.test(text)) return 'Sem ligação. Tenta outra vez daqui a pouco.';
   if (error?.hint) return error.hint;
@@ -95,6 +102,9 @@ const ICONS = {
   left: '<path d="m15 5-7 7 7 7"/>',
   right: '<path d="m9 5 7 7-7 7"/>',
   wallet: '<rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M16 14.5h2"/>',
+  star: '<path d="m12 3.5 2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8L12 3.5Z"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5"/><circle cx="12" cy="8" r=".6" fill="currentColor"/>',
+  block: '<circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/>',
   users: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.6a3.2 3.2 0 0 1 0 6M17.5 14a5.5 5.5 0 0 1 3 5"/>',
 };
 
@@ -209,7 +219,87 @@ export async function header(current) {
     'Viagens de quem viajou com o Plan-ish. ',
     el('strong', {}, 'GPS verificado'), ' quer dizer que o GPS do telemóvel confirmou a maior parte das paragens. ',
     el('a', { href: 'https://jrafael-rep.github.io/plan-ish-releases/' }, 'Sobre a app'), ' · ',
-    el('a', { href: 'privacidade.html' }, 'Privacidade'),
+    el('a', { href: 'privacidade.html' }, 'Privacidade'), ' · ',
+    el('a', { href: 'termos.html' }, 'Termos'),
   )));
   return session;
+}
+
+/* --------------------------------------------------------------- termos */
+
+function isTermsError(error) {
+  return /terms_required|terms_outdated/.test(`${error?.message ?? ''} ${error?.hint ?? ''}`);
+}
+
+/** Pergunta, num diálogo, se a pessoa aceita os termos em vigor. */
+function askTerms() {
+  return new Promise((resolve) => {
+    const dialog = el('dialog', { class: 'terms-dialog', 'aria-labelledby': 'terms-dialog-title' },
+      el('h2', { id: 'terms-dialog-title' }, 'Termos de utilização'),
+      el('p', {}, 'Antes de publicar, comentar ou avaliar, aceita os termos da Comunidade: o que se pode publicar e o que acontece a quem não os cumpre.'),
+      el('p', {}, el('a', { href: 'termos.html', target: '_blank', rel: 'noopener' }, 'Ler os termos de utilização')),
+      el('form', { method: 'dialog', class: 'row end' },
+        el('button', { class: 'btn quiet', value: 'cancel' }, 'Cancelar'),
+        el('button', { class: 'btn primary', value: 'accept' }, 'Aceito')));
+    dialog.addEventListener('close', () => { resolve(dialog.returnValue === 'accept'); dialog.remove(); });
+    document.body.append(dialog);
+    dialog.showModal();
+  });
+}
+
+/** Aceita a versão em vigor dos termos. Devolve o erro, se houver. */
+export async function acceptCurrentTerms() {
+  const { data, error } = await sb.rpc('my_terms');
+  if (error) return error;
+  const version = data?.[0]?.version;
+  if (!version) return null;
+  const { error: err } = await sb.rpc('accept_terms', { p_version: version });
+  return err ?? null;
+}
+
+/**
+ * Corre `action` (uma chamada ao Supabase que devolve { data, error }). Se o
+ * servidor pedir os termos, mostra-os e, se a pessoa aceitar, tenta outra vez.
+ * Sem aceitação, devolve { cancelled: true }.
+ */
+export async function withTerms(action) {
+  const first = await action();
+  if (!isTermsError(first.error)) return first;
+  if (!(await askTerms())) return { cancelled: true };
+  const err = await acceptCurrentTerms();
+  if (err) return { error: err };
+  return action();
+}
+
+/* ------------------------------------------------------------- bloqueios */
+
+/** As contas que a pessoa com sessão bloqueou: deixa de ver o que escrevem. */
+export async function blockedSet(session) {
+  if (!session) return new Set();
+  const { data } = await sb.from('user_blocks').select('blocked_id');
+  return new Set((data ?? []).map((b) => b.blocked_id));
+}
+
+export async function blockUser(session, userId, name) {
+  if (!confirm(`Bloquear ${name}? Deixas de ver as avaliações, os comentários e os itinerários desta pessoa. Podes desbloquear na tua conta.`)) return false;
+  const { error } = await sb.from('user_blocks').insert({ blocker_id: session.user.id, blocked_id: userId });
+  if (error && error.code !== '23505') { alert(explain(error)); return false; }
+  return true;
+}
+
+/* -------------------------------------------------------------- estrelas */
+
+/** "4,6": uma casa decimal, com vírgula. */
+export function starText(n) {
+  return Number(n).toFixed(1).replace('.', ',');
+}
+
+/** Cinco estrelas, cheias até `n`, só para ver (o leitor de ecrã lê o rótulo). */
+export function starRow(n, label = `${n} de 5 estrelas`) {
+  return el('span', { class: 'stars', role: 'img', 'aria-label': label },
+    ...[1, 2, 3, 4, 5].map((i) => {
+      const s = icon('star');
+      s.classList.toggle('on', i <= n);
+      return s;
+    }));
 }

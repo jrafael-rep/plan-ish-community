@@ -1,4 +1,6 @@
-import { $, avatar, badge, el, explain, header, monthLabel, notice, relativeDay, sb, show, signInLink } from './app.js';
+import {
+  $, acceptCurrentTerms, avatar, badge, el, explain, header, monthLabel, notice, relativeDay, sb, show, signInLink,
+} from './app.js';
 
 const session = await header('conta');
 const status = $('status');
@@ -23,6 +25,10 @@ async function load() {
     badge(it.evidence ?? 'plan'),
   )) : [el('p', { class: 'muted' }, 'Ainda não publicaste nenhum. Publica-se a partir da app, numa viagem concluída.')]));
   await loadShared();
+  await loadTerms();
+  await loadBlocks();
+  const { data: admin } = await sb.rpc('am_i_admin');
+  show($('moderation-link'), admin === true);
   await loadLinks();
   show($('account'), true);
   if (location.hash === '#planos') $('planos').scrollIntoView();
@@ -41,6 +47,43 @@ async function loadShared() {
       el('span', { class: 'muted small block' }, `${m.role === 'owner' ? 'Teu' : 'Partilhado contigo'} · mudado ${relativeDay(m.plan.updated_at)}`)),
     el('span', { class: 'muted small' }, 'Editar'),
   )) : [el('p', { class: 'muted' }, 'Nenhum. Na app, num plano: Ações › Editar em conjunto.')]));
+}
+
+async function loadTerms() {
+  const box = $('terms');
+  const { data, error } = await sb.rpc('my_terms');
+  // Sem o esquema 7 ainda não há termos para aceitar.
+  if (error) { show($('termos'), false); show(box, false); return; }
+  const row = data?.[0];
+  if (!row?.version) { box.replaceChildren(el('p', { class: 'muted' }, 'Não há termos a aceitar.')); return; }
+  if (row.accepted) {
+    box.replaceChildren(el('p', { class: 'muted' }, 'Aceitaste a versão em vigor dos ', el('a', { href: 'termos.html' }, 'termos de utilização'), '.'));
+    return;
+  }
+  box.replaceChildren(
+    el('p', {}, 'Para publicar, avaliar ou comentar, aceita os ', el('a', { href: 'termos.html' }, 'termos de utilização'), '.'),
+    el('p', { class: 'row' }, el('button', {
+      class: 'btn primary', type: 'button',
+      onclick: async () => {
+        const err = await acceptCurrentTerms();
+        if (err) { notice(status, explain(err), 'error'); return; }
+        await loadTerms();
+      },
+    }, 'Li e aceito')));
+}
+
+async function loadBlocks() {
+  const box = $('blocks');
+  const { data, error } = await sb.from('user_blocks')
+    .select('blocked_id, created_at, who:profiles!user_blocks_blocked_id_fkey(display_name)').order('created_at');
+  if (error) { box.replaceChildren(el('p', { class: 'muted' }, 'Ninguém.')); return; }
+  box.replaceChildren(...(data?.length ? data.map((b) => el('div', { class: 'card' },
+    el('strong', {}, b.who?.display_name ?? 'Viajante'),
+    el('p', { class: 'row' }, el('button', { class: 'btn', type: 'button', onclick: async () => {
+      await sb.from('user_blocks').delete().eq('blocker_id', session.user.id).eq('blocked_id', b.blocked_id);
+      await loadBlocks();
+    } }, 'Desbloquear')),
+  )) : [el('p', { class: 'muted' }, 'Ninguém. Numa avaliação ou comentário, o botão ⊘ bloqueia quem o escreveu.')]));
 }
 
 async function loadLinks() {
@@ -82,7 +125,7 @@ async function loadNextName() {
 
 $('signout').addEventListener('click', async () => { await sb.auth.signOut(); location.href = './'; });
 $('delete').addEventListener('click', async () => {
-  if (!confirm('Apagar a conta, os itinerários publicados, os comentários e os gostos? Isto não se desfaz.')) return;
+  if (!confirm('Apagar a conta, os itinerários publicados, as avaliações, os comentários e os gostos? Isto não se desfaz.')) return;
   const { error } = await sb.rpc('delete_my_account');
   if (error) { notice(status, explain(error), 'error'); return; }
   await sb.auth.signOut();
