@@ -10,6 +10,10 @@ Site estático (GitHub Pages) sobre uma base de dados Supabase.
 - **A app** lê o feed sem conta e, depois de **ligada** a uma conta (confirmado aqui, em `ligar.html`),
   publica viagens concluídas (com orçamento e fotografias, se quiser), comenta e gosta. A app nunca
   inicia sessão nem vê passwords.
+- **Planos partilhados** (só membros): um plano editado por várias pessoas ao mesmo tempo, na app e
+  aqui (`plano.html`). As alterações vão campo a campo; no mesmo campo, fica a última. O site vê-as
+  ao vivo (Supabase Realtime) e mostra quem está na página; a app pergunta a cada 2 s enquanto o
+  plano está aberto. Vai o plano completo, incluindo casa e ponto de partida; o GPS nunca.
 
 O cartão de uma viagem (`assets/card.js`) é o mesmo no feed, no itinerário e no perfil, e a app
 desenha o mesmo no separador Comunidade. Ver `DESIGN.md`.
@@ -23,15 +27,19 @@ desenha o mesmo no separador Comunidade. Ver `DESIGN.md`.
 | `viajante.html?id=…` | Perfil público: estatísticas e grelha das viagens publicadas e feitas |
 | `entrar.html` | Entrar com um link por email |
 | `ligar.html?pedido=…` | Confirmar a ligação da app (só "Entrar" e "Ligar"; sem planos nem preços) |
+| `plano.html?id=…` | Editar um plano partilhado ao vivo: dias, paragens, durações, horas, notas; quem está na página; convidar; sair |
+| `convite.html?c=…` | Aceitar um convite para um plano partilhado (ou abri-lo na app) |
 | `conta.html` | O teu nome (e quem o escolheu), o nome do próximo viajante, itinerários, telemóveis ligados, sair, apagar conta |
 | `privacidade.html` | O que a Comunidade guarda, o que é público e como se apaga |
 
 ## Configurar (uma vez)
 
 1. **Base de dados**: no Supabase, *SQL Editor* → colar `supabase/001_community.sql` → *Run*;
-   depois `supabase/002_names.sql`, `supabase/003_originals_and_replies.sql` e
-   `supabase/004_budget_and_photos.sql`, por esta ordem. Podem correr outra vez sem estragar nada.
+   depois `supabase/002_names.sql`, `supabase/003_originals_and_replies.sql`,
+   `supabase/004_budget_and_photos.sql` e `supabase/005_shared_plans.sql`, por esta ordem. Podem correr outra vez sem estragar nada.
    O 004 cria no Storage o bucket público `itinerary-photos` (fotografias até 700 KB, só JPEG).
+   O 005 junta a tabela dos planos partilhados à publicação `supabase_realtime`; confirmar em
+   *Database → Publications* que ela lá está (sem ela, o site pergunta a cada 3 s em vez de ao vivo).
    No telemóvel, colar ficheiros grandes corta o texto: usar as versões em partes.
 2. **Autenticação**: *Authentication → URL Configuration*
    - Site URL: `https://jrafael-rep.github.io/plan-ish-community/`
@@ -62,6 +70,9 @@ on conflict (user_id) do nothing;
 ```
 
 Só membros a interagir: `update public.community_settings set members_only = true;`
+
+Os **planos partilhados** são sempre só para membros, mesmo na prova de conceito: para os
+experimentar, as duas pessoas precisam da linha em `memberships` acima.
 
 ## Moderação
 

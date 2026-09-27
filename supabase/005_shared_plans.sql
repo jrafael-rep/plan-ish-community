@@ -228,15 +228,16 @@ begin
 end $$;
 
 /* Quem está no plano: só o nome público e o papel. */
+drop function if exists public.app_plan_members(text, uuid);
 create or replace function public.app_plan_members(p_token text, p_plan uuid)
-returns table (display_name text, role text)
+returns table (display_name text, role text, is_me boolean)
 language plpgsql security definer set search_path = '' as $$
 declare uid uuid := private.require_user(p_token);
 begin
   if private.plan_role(p_plan, uid) is null then
     raise exception 'not_in_plan' using errcode = '42501', hint = 'Este plano não está partilhado contigo.';
   end if;
-  return query select p.display_name, m.role from public.shared_plan_members m
+  return query select p.display_name, m.role, m.user_id = uid from public.shared_plan_members m
     join public.profiles p on p.id = m.user_id
     where m.plan_id = p_plan order by m.role desc, m.added_at;
 end $$;

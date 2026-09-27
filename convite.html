@@ -6,12 +6,12 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://gmizaoscvwarsppcmfpr.supabase.co wss://gmizaoscvwarsppcmfpr.supabase.co https://cdn.jsdelivr.net; img-src 'self' data: https://gmizaoscvwarsppcmfpr.supabase.co; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; base-uri 'self'; form-action 'self'">
 <meta name="color-scheme" content="light dark">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<title>Conta · Comunidade Plan-ish</title>
+<title>Convite · Comunidade Plan-ish</title>
 <meta name="robots" content="noindex">
 <meta name="description" content="Viagens de quem viajou com o Plan-ish: itinerários com GPS verificado, fotografias e orçamento. Copia um para o teu planeamento.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Comunidade Plan-ish">
-<meta property="og:title" content="Conta · Comunidade Plan-ish">
+<meta property="og:title" content="Convite · Comunidade Plan-ish">
 <meta property="og:description" content="Viagens de quem viajou com o Plan-ish: itinerários com GPS verificado, fotografias e orçamento. Copia um para o teu planeamento.">
 <meta property="og:image" content="https://jrafael-rep.github.io/plan-ish-community/assets/og.jpg">
 <meta property="og:image:width" content="1200">
@@ -23,33 +23,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="assets/style.css">
-<script type="module" src="assets/account.js"></script>
+<script type="module" src="assets/invite.js"></script>
 </head>
 <body>
 <main class="wrap">
-<h1>A tua conta</h1>
+<h1>Convite para um plano</h1>
 <div id="status"></div>
-<section id="account" class="hidden">
+<section id="invite" class="hidden">
   <div class="hero">
-    <p class="name" id="name"></p>
-    <p class="muted small" id="named-by"></p>
-    <p class="muted small"><span id="membership"></span> <span id="email"></span></p>
-    <p class="row"><a class="btn" id="public-profile" href="#">Ver o meu perfil público</a></p>
+    <p class="name" id="invite-title"></p>
+    <p class="muted" id="invite-who"></p>
   </div>
-  <p class="muted small after-hero">Na Comunidade ninguém escolhe o próprio nome: cada pessoa recebe um, e escolhe o nome da próxima que chegar. O email nunca aparece.</p>
-  <h2>O nome do próximo viajante</h2>
-  <div id="next-name" class="composer"></div>
-  <h2>Os teus itinerários</h2>
-  <div id="mine"></div>
-  <h2 id="planos">Planos partilhados</h2>
-  <div id="shared"></div>
-  <h2>Telemóveis ligados</h2>
-  <div id="links"></div>
-  <h2>Sessão</h2>
-  <p class="row"><button class="btn" id="signout" type="button">Sair</button></p>
-  <h2>Apagar a conta</h2>
-  <p class="muted small">Apaga a conta, os itinerários que publicaste, os comentários e os gostos. Não se desfaz. As viagens na app ficam no teu telemóvel.</p>
-  <p class="row"><button class="btn danger" id="delete" type="button">Apagar a minha conta</button></p>
+  <p class="muted small after-hero">Num plano partilhado, todos editam os dias e as paragens, aqui no site ou na app, e veem as alterações dos outros ao vivo. O plano inclui a casa e o ponto de partida de quem o criou; o percurso GPS de cada um nunca sai do telemóvel.</p>
+  <p class="row"><button id="accept" class="btn primary" type="button">Entrar no plano</button><a id="in-app" class="btn" href="#">Abrir na app</a></p>
 </section>
 </main>
 </body>

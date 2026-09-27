@@ -160,6 +160,7 @@ expect "campos diferentes não se estragam" '^90$' "$(q authenticated $A "select
 expect "apagar é escrever deleted" '^true$' "$(q anon '' "select public.app_write_plan_fields('$TOK','$SP','dev-a','[{\"key\":\"stop:s1:deleted\",\"value\":true}]'::jsonb)" >/dev/null; q authenticated $B "select value from public.shared_plan_fields where plan_id = '$SP' and key = 'stop:s1:deleted'")"
 expect "mudar o nome da viagem muda o nome do plano" '^Algarve e Alentejo$' "$(q anon '' "select public.app_write_plan_fields('$TOK','$SP','dev-a','[{\"key\":\"trip:trip:name\",\"value\":\"Algarve e Alentejo\"}]'::jsonb)" >/dev/null; q anon '' "select title from public.app_my_shared_plans('$TOK')")"
 expect "a app vê quem está no plano" '^2$' "$(q anon '' "select count(*) from public.app_plan_members('$TOK','$SP')")"
+expect "a app sabe qual dos membros é quem pergunta" '^owner$' "$(q anon '' "select role from public.app_plan_members('$TOK','$SP') where is_me")"
 expect "B sai do plano" '^0$' "$(q authenticated $B "select public.leave_plan('$SP')" >/dev/null; q anon '' "select count(*) from public.app_my_shared_plans('$BTOK')")"
 expect "quem não está no plano não vê os membros" 'not_in_plan' "$(q anon '' "select * from public.app_plan_members('$BTOK','$SP')")"
 expect "B volta a entrar pela app com o código" "^$SP\$" "$(q anon '' "select public.app_accept_plan_invite('$BTOK',upper('$CODE'))")"

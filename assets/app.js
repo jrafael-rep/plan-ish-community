@@ -41,6 +41,9 @@ export function explain(error) {
   if (/name_taken/.test(text)) return 'Esse nome acabou de ser atribuído a outra pessoa. Escolhe entre os novos.';
   if (/name_not_offered/.test(text)) return 'Já escolheste o nome do próximo viajante.';
   if (/reply_invalid/.test(text)) return 'Só se responde a comentários deste itinerário.';
+  if (/not_in_plan/.test(text)) return 'Este plano não está partilhado contigo.';
+  if (/invite_invalid/.test(text)) return 'Este convite expirou ou não existe. Pede um novo a quem te convidou.';
+  if (/fields_invalid/.test(text)) return 'Uma alteração não foi aceite. Recarrega a página e tenta outra vez.';
   if (/not_signed_in|JWT/.test(text)) return 'Entra na tua conta primeiro.';
   if (/Failed to fetch|NetworkError/.test(text)) return 'Sem ligação. Tenta outra vez daqui a pouco.';
   if (error?.hint) return error.hint;

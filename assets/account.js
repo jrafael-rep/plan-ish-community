@@ -1,4 +1,4 @@
-import { $, avatar, badge, el, explain, header, monthLabel, notice, sb, show, signInLink } from './app.js';
+import { $, avatar, badge, el, explain, header, monthLabel, notice, relativeDay, sb, show, signInLink } from './app.js';
 
 const session = await header('conta');
 const status = $('status');
@@ -22,8 +22,25 @@ async function load() {
       it.travelled_month ? el('span', { class: 'muted small block' }, monthLabel(it.travelled_month)) : null),
     badge(it.evidence ?? 'plan'),
   )) : [el('p', { class: 'muted' }, 'Ainda não publicaste nenhum. Publica-se a partir da app, numa viagem concluída.')]));
+  await loadShared();
   await loadLinks();
   show($('account'), true);
+  if (location.hash === '#planos') $('planos').scrollIntoView();
+}
+
+async function loadShared() {
+  const { data, error } = await sb.from('shared_plan_members')
+    .select('role, plan:shared_plans(id, title, updated_at)')
+    .eq('user_id', session.user.id);
+  const box = $('shared');
+  // Sem o esquema 5, a secção simplesmente não aparece.
+  if (error) { show($('planos'), false); show(box, false); return; }
+  const plans = (data ?? []).filter((m) => m.plan).sort((a, b) => (a.plan.updated_at < b.plan.updated_at ? 1 : -1));
+  box.replaceChildren(...(plans.length ? plans.map((m) => el('a', { class: 'card mini', href: `plano.html?id=${encodeURIComponent(m.plan.id)}` },
+    el('span', {}, el('strong', {}, m.plan.title),
+      el('span', { class: 'muted small block' }, `${m.role === 'owner' ? 'Teu' : 'Partilhado contigo'} · mudado ${relativeDay(m.plan.updated_at)}`)),
+    el('span', { class: 'muted small' }, 'Editar'),
+  )) : [el('p', { class: 'muted' }, 'Nenhum. Na app, num plano: Ações › Editar em conjunto.')]));
 }
 
 async function loadLinks() {
