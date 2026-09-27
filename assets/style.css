@@ -323,6 +323,7 @@ a.who:hover { color: var(--accent); }
 .card { display: block; color: inherit; text-decoration: none; background: var(--surface); border-radius: var(--r-sm); padding: .85rem 1rem; margin: .6rem 0; box-shadow: var(--shadow); }
 a.card:hover { color: inherit; background: var(--surface-2); }
 .card.mini { display: flex; align-items: center; gap: .85rem; justify-content: space-between; }
+.after-hero { margin-top: .9rem; }
 .choices { display: flex; flex-wrap: wrap; gap: .5rem; margin: .6rem 0; }
 section h2 { margin-top: 1.75rem; margin-bottom: .6rem; }
 .panel h2, .profile-head h2 { margin-top: 0; }

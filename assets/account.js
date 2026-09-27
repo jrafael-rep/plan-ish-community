@@ -41,7 +41,8 @@ async function loadNextName() {
   const { data, error } = await sb.rpc('my_name_choices');
   const row = data?.[0];
   const box = $('next-name');
-  if (error || !row) { notice(box, explain(error), 'error'); return; }
+  if (error) { notice(box, explain(error), 'error'); return; }
+  if (!row) { box.replaceChildren(el('p', { class: 'muted' }, 'Não há nomes livres por agora.')); return; }
   $('named-by').textContent = row.named_by ? `Escolhido por ${row.named_by}.` : '';
   if (row.chosen) {
     box.replaceChildren(el('p', {}, 'Escolheste ', el('strong', {}, row.chosen), ' para a próxima pessoa que se juntar à Comunidade.'));
@@ -64,7 +65,7 @@ async function loadNextName() {
 
 $('signout').addEventListener('click', async () => { await sb.auth.signOut(); location.href = './'; });
 $('delete').addEventListener('click', async () => {
-  if (!confirm('Apagar a conta, os itinerários publicados, os comentários e os likes? Isto não se desfaz.')) return;
+  if (!confirm('Apagar a conta, os itinerários publicados, os comentários e os gostos? Isto não se desfaz.')) return;
   const { error } = await sb.rpc('delete_my_account');
   if (error) { notice(status, explain(error), 'error'); return; }
   await sb.auth.signOut();
