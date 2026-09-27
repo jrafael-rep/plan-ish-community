@@ -31,6 +31,8 @@ function stopsOf(plan) {
  * sobre a cor da viagem. Só usa coordenadas que o itinerário já mostra.
  */
 export function routeCover(it) {
+  // Vai para dentro de um id de SVG: só letras, números e hífenes.
+  const gid = `g${String(it.id).replace(/[^\w-]/g, '')}`;
   const [from, to] = COVERS[hue(it.id) % COVERS.length];
   const points = stopsOf(it.plan).filter((s) => Number.isFinite(s.lat) && Number.isFinite(s.lon));
   let path = '';
@@ -49,8 +51,8 @@ export function routeCover(it) {
   }
   const t = document.createElement('template');
   t.innerHTML = `<svg class="cover" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <defs><linearGradient id="g${it.id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs>
-    <rect width="400" height="300" fill="url(#g${it.id})"/>
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#${gid})"/>
     <g fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="1.5">
       <path d="M-20 230c60-30 120 20 180-10s120-50 260-10"/><path d="M-20 260c60-30 120 20 180-10s120-50 260-10"/><path d="M-20 200c60-30 120 20 180-10s120-50 260-10"/>
     </g>${path}${dots}

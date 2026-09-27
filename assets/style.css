@@ -134,6 +134,11 @@ label { display: block; font-weight: 700; margin: 0 0 .35rem; }
 }
 .tab:hover { color: var(--text); }
 .tab[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--bg); }
+.search { border-radius: 999px; padding-inline: 1.1rem; margin-bottom: .7rem; }
+.sorts { display: flex; gap: 1.1rem; margin-top: .6rem; }
+.sort { border: 0; background: none; padding: .4rem 0; min-height: 36px; font: 700 .9rem/1 var(--font); color: var(--muted); cursor: pointer; }
+.sort:hover { color: var(--text); }
+.sort[aria-pressed="true"] { color: var(--accent); text-decoration: underline; text-underline-offset: .3em; }
 .feed { display: grid; gap: 1.1rem; }
 .more-btn { display: flex; margin: 1.25rem auto 0; }
 
