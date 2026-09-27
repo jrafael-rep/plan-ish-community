@@ -12,8 +12,8 @@ Site estático (GitHub Pages) sobre uma base de dados Supabase.
   inicia sessão nem vê passwords.
 - **Planos partilhados** (só membros): um plano editado por várias pessoas ao mesmo tempo, na app e
   aqui (`plano.html`). As alterações vão campo a campo; no mesmo campo, fica a última. O site vê-as
-  ao vivo (Supabase Realtime) e mostra quem está na página; a app pergunta a cada 2 s enquanto o
-  plano está aberto. Vai o plano completo, incluindo casa e ponto de partida; o GPS nunca.
+  ao vivo (Supabase Realtime) e mostra quem está na página; a app recebe um toque sem conteúdo pelo
+  Realtime quando o plano muda, e só então vai buscar o que mudou. Vai o plano completo, incluindo casa e ponto de partida; o GPS nunca.
 
 O cartão de uma viagem (`assets/card.js`) é o mesmo no feed, no itinerário e no perfil, e a app
 desenha o mesmo no separador Comunidade. Ver `DESIGN.md`.
