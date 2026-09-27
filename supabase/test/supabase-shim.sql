@@ -19,6 +19,13 @@ create table storage.objects (id uuid primary key default gen_random_uuid(), buc
   name text not null, unique (bucket_id, name));
 alter table storage.objects enable row level security;
 grant insert (bucket_id, name) on storage.objects to anon, authenticated;
+grant select, delete on storage.objects to anon, authenticated;
+-- A operação da API do Storage que está a correr ("storage.object.delete_many"...).
+create function storage.operation() returns text language sql stable as $$ select current_setting('storage.operation', true) $$;
+create function storage.allow_any_operation(expected_operations text[]) returns boolean language sql stable as $$
+  select exists (select 1 from unnest(expected_operations) e
+                  where regexp_replace(coalesce(storage.operation(), ''), '^storage\.', '') = regexp_replace(e, '^storage\.', '')) $$;
+grant execute on function storage.operation(), storage.allow_any_operation(text[]) to anon, authenticated;
 -- O Realtime: só a função que manda avisos, a registar o que mandaria.
 create schema realtime;
 create table realtime.sent (id bigserial primary key, payload jsonb, event text, topic text, private boolean);

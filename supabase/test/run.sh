@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 # Os termos (esquema 7) só se exigem nos testes do fim; até lá, como antes.
@@ -220,6 +220,34 @@ expect "não me bloqueio a mim" 'self_block' "$(q anon '' "select public.app_set
 expect "cada um só vê os seus bloqueios" '^0$' "$(q authenticated $A 'select count(*) from public.user_blocks')"
 expect "apagar a própria avaliação" '^0$' "$(q anon '' "select public.app_delete_review('$BTOK','$OID')" >/dev/null; q anon '' "select count(*) from public.app_my_review('$BTOK','$OID')")"
 adm "update public.community_settings set terms_version = null" >/dev/null
+
+# ------------------------------------------------ esquema 8: retirar de verdade
+adm "update private.photo_tickets set created_at = now()" >/dev/null
+adm "update public.itineraries set hidden = true where id = '$IID'" >/dev/null
+expect "a lista mostra os meus, com fotos e contas" '^2\|[0-9]+\|[0-9]+$' "$(q anon '' "select photo_count||'|'||like_count||'|'||review_count from public.app_my_published('$TOK') where id = '$OID'")"
+expect "o escondido pela moderação também aparece ao autor" '^t$' "$(q anon '' "select hidden from public.app_my_published('$TOK') where id = '$IID'")"
+expect "B não vê os de A na sua lista" '^0$' "$(q anon '' "select count(*) from public.app_my_published('$BTOK') where id = '$OID'")"
+expect "o site lista os meus com sessão" '^t$' "$(q authenticated $A "select hidden from public.my_published() where id = '$IID'")"
+expect "anon não pede a lista do site" 'permission denied' "$(q anon '' 'select count(*) from public.my_published()')"
+expect "listar o bucket não mostra nada" '^0$' "$(q anon '' 'select count(*) from storage.objects')"
+TK2=$(q anon "" "select public.app_photo_ticket('$TOK','$OID')")
+q anon '' "insert into storage.objects(bucket_id,name) values ('itinerary-photos','$TK2/1.jpg')" >/dev/null
+expect "trocar as fotos põe as antigas no lixo" "^$TK/1.jpg,$TK/2.jpg\$" "$(q anon '' "select public.app_set_photos('$TOK','$OID','$TK2',1)" >/dev/null; q anon '' "select array_to_string(public.app_photo_trash('$TOK'), ',')")"
+expect "o lixo de A não é dado a B" '^$' "$(q anon '' "select array_to_string(public.app_photo_trash('$BTOK'), ',')")"
+expect "fora da operação de apagar, o lixo não se vê" '^0$' "$(q anon '' 'select count(*) from storage.objects')"
+expect "na operação de apagar, vê-se só o lixo" '^2$' "$(q anon '' "set local storage.operation = 'storage.object.delete_many'; select count(*) from storage.objects")"
+expect "apagar o que não é lixo não apaga nada" '^0$' "$(q anon '' "set local storage.operation = 'storage.object.delete_many'; with d as (delete from storage.objects where name = '$TK2/1.jpg' returning 1) select count(*) from d")"
+expect "apagar o lixo apaga" '^2$' "$(q anon '' "set local storage.operation = 'storage.object.delete_many'; with d as (delete from storage.objects where name like '$TK/%' returning 1) select count(*) from d")"
+expect "o que já saiu do bucket sai do lixo" '^\|0$' "$(q anon '' "select array_to_string(public.app_photo_trash('$TOK'), ',')")|$(adm 'select count(*) from private.photo_trash')"
+expect "B não retira o itinerário de A" '^1$' "$(q anon '' "select public.app_withdraw('$BTOK','$OID')" >/dev/null; q anon '' "select count(*) from public.itineraries where id = '$OID'")"
+expect "retirar devolve as fotos a apagar" "^$TK2/1.jpg\$" "$(q anon '' "select array_to_string(public.app_withdraw('$TOK','$OID'), ',')")"
+expect "o itinerário sai, com os comentários e as avaliações" '^0 0 0$' "$(q anon '' "select count(*) from public.itineraries where id = '$OID'; select count(*) from public.comments where itinerary_id = '$OID'; select count(*) from public.reviews where itinerary_id = '$OID'")"
+adm "insert into storage.objects(bucket_id,name) values ('itinerary-photos','orfa/1.jpg'); insert into private.photo_trash(path,user_id) values ('orfa/1.jpg', gen_random_uuid())" >/dev/null
+expect "fotos de contas apagadas: quem limpa a seguir leva-as" '^orfa/1.jpg$' "$(q anon '' "select array_to_string(public.app_photo_trash('$BTOK'), ',')")"
+BIID=$(q anon "" "select public.app_publish('$BTOK','Do B','Porto','s',1,1,null,'{}'::jsonb,'trip-b')")
+expect "no site, antes de apagar a conta, retira-se tudo" '^0$' "$(q authenticated $B 'select public.withdraw_all_mine()' >/dev/null; q anon '' "select count(*) from public.itineraries where author_id = '$B'")"
+expect "anon não retira pelo site" 'permission denied' "$(q anon '' "select public.withdraw_itinerary('$IID')")"
+expect "B não retira pelo site o de A" '^1$' "$(q authenticated $B "select public.withdraw_itinerary('$IID')" >/dev/null; adm "select count(*) from public.itineraries where id = '$IID'")"
 
 adm "update public.itineraries set hidden = true where id = '$IID'"
 expect "escondido some do feed" '^0$' "$(q anon '' "select count(*) from public.itineraries where id = '$IID'")"
