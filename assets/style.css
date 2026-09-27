@@ -135,6 +135,7 @@ label { display: block; font-weight: 700; margin: 0 0 .35rem; }
 .tab:hover { color: var(--text); }
 .tab[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--bg); }
 .feed { display: grid; gap: 1.1rem; }
+.more-btn { display: flex; margin: 1.25rem auto 0; }
 
 /* ------------------------------------------------------------- cartão */
 .trip { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }

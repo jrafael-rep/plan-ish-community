@@ -1,4 +1,4 @@
-import { $, explain, header, notice, sb } from './app.js';
+import { $, el, explain, header, notice, sb } from './app.js';
 import { CARD_COLUMNS, likedSet, tripCard } from './card.js';
 
 const session = await header('feed');
@@ -12,22 +12,47 @@ const EMPTY = {
   plan: 'Ainda não há roteiros publicados.',
 };
 
+const PAGE = 20;
+let level = '';
+let shown = [];
+/** Only the newest request fills the feed: tabs switch faster than the network. */
+let request = 0;
+const more = el('button', { class: 'btn more-btn', type: 'button', hidden: true, onclick: () => void load(true) }, 'Ver mais viagens');
+feed.after(more);
+
 for (const tab of document.querySelectorAll('.tab')) {
   tab.addEventListener('click', () => {
     for (const other of document.querySelectorAll('.tab')) other.setAttribute('aria-pressed', String(other === tab));
-    void load(tab.dataset.level ?? '');
+    level = tab.dataset.level ?? '';
+    void load(false);
   });
 }
-await load('');
+await load(false);
 
-async function load(level) {
-  notice(status, 'A carregar…');
-  let query = sb.from('itineraries').select(CARD_COLUMNS).order('created_at', { ascending: false }).limit(30);
+async function load(append) {
+  const mine = ++request;
+  const from = append ? shown.length : 0;
+  if (append) { more.disabled = true; more.textContent = 'A carregar…'; } else { notice(status, 'A carregar…'); more.hidden = true; }
+  // O id desempata: uma página nunca repete nem salta viagens publicadas no mesmo instante.
+  let query = sb.from('itineraries').select(CARD_COLUMNS)
+    .order('created_at', { ascending: false }).order('id', { ascending: false })
+    .range(from, from + PAGE - 1);
   if (level) query = query.eq('evidence', level);
   const { data, error } = await query;
-  if (error) { feed.replaceChildren(); notice(status, explain(error), 'error'); return; }
-  if (!data.length) { feed.replaceChildren(); notice(status, EMPTY[level] ?? EMPTY['']); return; }
+  if (mine !== request) return;
+  more.disabled = false; more.textContent = 'Ver mais viagens';
+  if (error) {
+    if (append) { notice(status, explain(error), 'error'); return; }
+    feed.replaceChildren(); notice(status, explain(error), 'error'); return;
+  }
+  if (!append && !data.length) { feed.replaceChildren(); notice(status, EMPTY[level] ?? EMPTY['']); return; }
   const liked = await likedSet(session, data.map((it) => it.id));
+  if (mine !== request) return;
   status.replaceChildren();
-  feed.replaceChildren(...data.map((it) => tripCard(it, { session, liked: liked.has(it.id) })));
+  const seen = new Set(append ? shown.map((it) => it.id) : []);
+  const fresh = data.filter((it) => !seen.has(it.id));
+  shown = append ? [...shown, ...fresh] : fresh;
+  const cards = fresh.map((it) => tripCard(it, { session, liked: liked.has(it.id) }));
+  if (append) feed.append(...cards); else feed.replaceChildren(...cards);
+  more.hidden = data.length < PAGE;
 }

@@ -50,6 +50,9 @@ class Thread {
       this.liked = new Set((mine ?? []).map((l) => l.comment_id));
     }
     $('comments-title').textContent = data.length ? `Conversa (${data.length})` : 'Conversa';
+    // O contador do cartão acompanha a conversa, sem recarregar a página.
+    const count = document.querySelector('#card .actions a.act span');
+    if (count) count.textContent = String(data.length);
     // Uma resposta a um comentário que já não se vê fica como comentário solto.
     const ids = new Set(data.map((c) => c.id));
     const tops = data.filter((c) => !c.parent_id || !ids.has(c.parent_id));
