@@ -1,4 +1,4 @@
-import { $, el, explain, header, notice, sb, show, signInLink } from './app.js';
+import { $, el, explain, header, notice, rememberAppScheme, sb, show, signInLink } from './app.js';
 import { APP_SCHEME } from './config.js';
 
 const session = await header('');
@@ -8,6 +8,8 @@ const request = params.get('pedido') ?? '';
 // A app diz como voltar a ela: a normal (planish) ou a de teste (planishdev).
 // Só estas duas; qualquer outra coisa volta para a normal.
 const scheme = ['planish', 'planishdev'].includes(params.get('app') ?? '') ? params.get('app') : APP_SCHEME;
+// E fica lembrada neste browser, para os botões "Abrir no Plan-ish" dos itinerários.
+if (params.get('app')) rememberAppScheme(scheme);
 
 if (!/^[0-9a-f-]{36}$/i.test(request)) {
   notice(status, 'Este link não tem um pedido de ligação. Abre-o a partir da app: Comunidade › Ligar à Comunidade.', 'error');

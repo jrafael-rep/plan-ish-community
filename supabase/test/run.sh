@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/001_community.sql -f $S/002_names.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 q() { local role=$1 sub=$2; shift 2
@@ -59,7 +59,7 @@ expect "publicar" '^[0-9a-f-]{36}$' "$IID"
 expect "voltar a publicar atualiza o mesmo" '^t$' "$(q anon '' "select public.app_publish('$TOK','Gerês 3 dias v2','Gerês','',3,10,'2026-09','{}'::jsonb,'trip-1') = '$IID'")"
 expect "feed sem conta" '^Gerês 3 dias v2\|0\|[^|]+ [^|]+$' "$(q anon '' "select i.title||'|'||i.like_count||'|'||p.display_name from public.itineraries i join public.profiles p on p.id = i.author_id")"
 expect "anon não escreve direto" 'permission denied' "$(q anon '' "insert into public.itineraries(author_id,title,day_count,stop_count,plan) values ('$A','x',1,1,'{}')")"
-expect "B não publica em nome de A" 'row-level security' "$(q authenticated $B "insert into public.itineraries(author_id,title,day_count,stop_count,plan) values ('$A','x',1,1,'{}')")"
+expect "B não publica em nome de A" 'row-level security|permission denied' "$(q authenticated $B "insert into public.itineraries(author_id,title,day_count,stop_count,plan) values ('$A','x',1,1,'{}')")"
 expect "ninguém mexe nos contadores" 'permission denied' "$(q authenticated $B 'update public.itineraries set like_count = 999')"
 expect "chave inválida" 'link_invalid' "$(q anon '' "select public.app_set_like('$(printf 'a%.0s' {1..64})','$IID',true)")"
 expect "like duas vezes conta um" '^1 1$' "$(q anon '' "select public.app_set_like('$TOK','$IID',true); select public.app_set_like('$TOK','$IID',true)")"
@@ -81,6 +81,47 @@ expect "B não despublica o de A" '^ *1$' "$(q anon '' "select public.app_unpubl
 expect "B não apaga comentários de A" '^1$' "$(q authenticated $B 'delete from public.comments; select count(*) from public.comments')"
 expect "o autor do itinerário modera comentários" '^0$' "$(q authenticated $A 'delete from public.comments; select count(*) from public.comments')"
 
+OID=$(q anon "" "select id from public.app_publish_v2('$TOK','Douro a pé','Douro','',2,4,'2026-08','{}'::jsonb,'trip-o', 4, 3, 150, 'test')")
+expect "prova boa dá original" 'original' "$(q anon '' "select evidence from public.itineraries where source_trip_id = 'trip-o'")"
+expect "o servidor não aceita mais GPS do que visitas" 'done' "$(q anon '' "select evidence from public.app_publish_v2('$TOK','Douro a pé','Douro','',2,4,'2026-08','{}'::jsonb,'trip-o', 1, 9, 150, 'test')")"
+expect "sem nada registado é roteiro" 'plan' "$(q anon '' "select evidence from public.app_publish_v2('$TOK','Só plano','','',1,4,null,'{}'::jsonb,'trip-p', 0, 0, 0, 'test')")"
+q anon "" "select public.app_publish_v2('$TOK','Douro a pé','Douro','',2,4,'2026-08','{}'::jsonb,'trip-o', 4, 3, 150, 'test')" >/dev/null
+expect "a publicação antiga tira o selo de original" 'plan' "$(q anon '' "select public.app_publish('$TOK','Douro','Douro','',2,4,'2026-08','{}'::jsonb,'trip-o'); select evidence from public.itineraries where source_trip_id = 'trip-o'" | awk '{print $2}')"
+q anon "" "select public.app_publish_v2('$TOK','Douro a pé','Douro','',2,4,'2026-08','{}'::jsonb,'trip-o', 4, 3, 150, 'test')" >/dev/null
+expect "o autor não muda a prova pelo site" 'permission denied' "$(q authenticated $A "update public.itineraries set evidence = 'original', gps_stops = 99 where author_id = '$A'")"
+expect "não se regista como feita a própria viagem" 'own_itinerary' "$(q anon '' "select public.app_record_completion('$TOK','$OID', 3, 3, 100)")"
+expect "B fez a viagem de A, confirmada por GPS" '^original$' "$(q anon '' "select public.app_record_completion('$BTOK','$OID', 4, 4, 200)")"
+expect "uma segunda vez não desce de nível" '^done$' "$(q anon '' "select public.app_record_completion('$BTOK','$OID', 1, 0, 0)")"
+expect "contadores de feita por" '^1\|1$' "$(q anon '' "select done_count||'|'||original_done_count from public.itineraries where id = '$OID'")"
+expect "ninguém regista uma viagem sem nada feito" 'nothing_done' "$(q anon '' "select public.app_record_completion('$BTOK','$OID', 0, 0, 0)")"
+C1=$(q anon "" "select public.app_comment_v2('$TOK','$OID','Onde estacionaram?', null)")
+R1=$(q anon "" "select public.app_comment_v2('$BTOK','$OID','No largo da igreja.', '$C1')")
+R2=$(q anon "" "select public.app_comment_v2('$TOK','$OID','Obrigado!', '$R1')")
+expect "respostas ficam num nível só" "^$C1\$" "$(q anon '' "select parent_id from public.comments where id = '$R2'")"
+expect "não se responde noutro itinerário" 'reply_invalid' "$(q anon '' "select public.app_comment_v2('$TOK','$IID','x', '$C1')")"
+expect "like num comentário conta um" '^1 1$' "$(q anon '' "select public.app_set_comment_like('$BTOK','$C1',true); select public.app_set_comment_like('$BTOK','$C1',true)")"
+expect "a app sabe de que comentários gostou" '^1$' "$(q anon '' "select count(*) from public.app_liked_comments('$BTOK', array['$C1']::uuid[])")"
+expect "o site responde com sessão" '^t$' "$(q authenticated $B "insert into public.comments(itinerary_id, author_id, body, parent_id) values ('$OID','$B','Pelo site','$C1'); select true")"
+expect "feita por lê-se sem conta" '^1$' "$(q anon '' "select count(*) from public.itinerary_completions where itinerary_id = '$OID'")"
+expect "orçamento numa margem" '^250-400$' "$(q anon '' "select public.app_set_budget('$TOK','$OID',250,400); select budget_min||'-'||budget_max from public.itineraries where id = '$OID'" | tr -d ' ')"
+expect "mínimo acima do máximo recusado" 'budget_invalid' "$(q anon '' "select public.app_set_budget('$TOK','$OID',500,100)")"
+expect "só um dos valores recusado" 'budget_invalid' "$(q anon '' "select public.app_set_budget('$TOK','$OID',100,null)")"
+expect "B não mexe no orçamento de A" 'not_yours' "$(q anon '' "select public.app_set_budget('$BTOK','$OID',1,2)")"
+expect "tirar o orçamento" '^t$' "$(q anon '' "select public.app_set_budget('$TOK','$OID',null,null); select budget_min is null from public.itineraries where id = '$OID'" | tr -d ' ')"
+expect "B não pede bilhete para fotos de A" 'not_yours' "$(q anon '' "select public.app_photo_ticket('$BTOK','$OID')")"
+TK=$(q anon "" "select public.app_photo_ticket('$TOK','$OID')")
+expect "bilhete para fotos" '^[0-9a-f-]{36}$' "$TK"
+expect "sem bilhete não se envia" 'row-level security' "$(q anon '' "insert into storage.objects(bucket_id,name) values ('itinerary-photos','$(cat /proc/sys/kernel/random/uuid)/1.jpg')")"
+expect "nome fora da regra recusado" 'row-level security' "$(q anon '' "insert into storage.objects(bucket_id,name) values ('itinerary-photos','$TK/7.jpg')")"
+expect "noutro bucket recusado" 'row-level security|foreign key' "$(q anon '' "insert into storage.objects(bucket_id,name) values ('outro','$TK/1.jpg')")"
+expect "com bilhete envia" '^ok$' "$(q anon '' "insert into storage.objects(bucket_id,name) values ('itinerary-photos','$TK/1.jpg'),('itinerary-photos','$TK/2.jpg'); select 'ok'")"
+expect "fotos que não chegaram recusadas" 'photo_missing' "$(q anon '' "select public.app_set_photos('$TOK','$OID','$TK',3)")"
+expect "B não usa o bilhete de A" 'not_yours' "$(q anon '' "select public.app_set_photos('$BTOK','$OID','$TK',2)")"
+expect "as fotos ficam no itinerário, à vista de todos" "^2 $TK/1.jpg\$" "$(q anon '' "select public.app_set_photos('$TOK','$OID','$TK',2)" >/dev/null; q anon '' "select cardinality(photos)||' '||photos[1] from public.itineraries where id = '$OID'")"
+expect "sete fotos recusadas" 'photos_invalid' "$(q anon '' "select public.app_set_photos('$TOK','$OID','$TK',7)")"
+adm "update private.photo_tickets set created_at = now() - interval '2 hours'"
+expect "bilhete expirado não envia" 'row-level security' "$(q anon '' "insert into storage.objects(bucket_id,name) values ('itinerary-photos','$TK/3.jpg')")"
+expect "ninguém muda as fotos pelo site" 'permission denied' "$(q authenticated $A "update public.itineraries set photos = '{}' where author_id = '$A'")"
 adm "update public.community_settings set members_only = true"
 expect "só membros: quem não é, não publica" 'members_only' "$(q anon '' "select public.app_publish('$TOK','t','d','s',1,1,null,'{}'::jsonb,'trip-2')")"
 adm "insert into public.memberships(user_id) values ('$A')"
@@ -91,7 +132,7 @@ expect "membro expirado deixa de o ser" '\|false\|false$' "$(q anon '' "select d
 adm "update public.community_settings set members_only = false"
 
 adm "update public.itineraries set hidden = true where id = '$IID'"
-expect "escondido some do feed" '^1$' "$(q anon '' 'select count(*) from public.itineraries')"
+expect "escondido some do feed" '^0$' "$(q anon '' "select count(*) from public.itineraries where id = '$IID'")"
 expect "o autor ainda o vê" '^1$' "$(q authenticated $A "select count(*) from public.itineraries where id = '$IID'")"
 expect "desligar invalida a chave" 'link_invalid' "$(q anon '' "select public.app_unlink('$TOK')" >/dev/null; q anon '' "select * from public.app_whoami('$TOK')")"
 expect "anon não apaga contas" 'permission denied' "$(q anon '' 'select public.delete_my_account()')"

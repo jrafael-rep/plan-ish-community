@@ -1,31 +1,33 @@
-import { $, el, explain, header, monthLabel, notice, plural, sb } from './app.js';
+import { $, explain, header, notice, sb } from './app.js';
+import { CARD_COLUMNS, likedSet, tripCard } from './card.js';
 
-await header('feed');
+const session = await header('feed');
 const status = $('status');
-notice(status, 'A carregar…');
+const feed = $('feed');
 
-const { data, error } = await sb.from('itineraries')
-  .select('id, title, destination, summary, day_count, stop_count, travelled_month, like_count, comment_count, author:profiles!itineraries_author_id_fkey(display_name)')
-  .order('created_at', { ascending: false })
-  .limit(60);
+const EMPTY = {
+  '': 'Ainda não há viagens publicadas. A primeira pode ser a tua: no Plan-ish, abre uma viagem concluída e escolhe "Publicar na Comunidade".',
+  original: 'Ainda não há viagens com GPS verificado. Aparecem quando o GPS do telemóvel confirma a maior parte das paragens.',
+  done: 'Ainda não há viagens feitas com paragens marcadas à mão.',
+  plan: 'Ainda não há roteiros publicados.',
+};
 
-if (error) {
-  notice(status, explain(error), 'error');
-} else if (!data.length) {
-  notice(status, 'Ainda não há itinerários publicados. O primeiro pode ser o teu: no Plan-ish, abre uma viagem concluída e escolhe "Publicar na Comunidade".');
-} else {
+for (const tab of document.querySelectorAll('.tab')) {
+  tab.addEventListener('click', () => {
+    for (const other of document.querySelectorAll('.tab')) other.setAttribute('aria-pressed', String(other === tab));
+    void load(tab.dataset.level ?? '');
+  });
+}
+await load('');
+
+async function load(level) {
+  notice(status, 'A carregar…');
+  let query = sb.from('itineraries').select(CARD_COLUMNS).order('created_at', { ascending: false }).limit(30);
+  if (level) query = query.eq('evidence', level);
+  const { data, error } = await query;
+  if (error) { feed.replaceChildren(); notice(status, explain(error), 'error'); return; }
+  if (!data.length) { feed.replaceChildren(); notice(status, EMPTY[level] ?? EMPTY['']); return; }
+  const liked = await likedSet(session, data.map((it) => it.id));
   status.replaceChildren();
-  $('feed').replaceChildren(...data.map((it) => el('a', { class: 'card', href: `itinerario.html?id=${encodeURIComponent(it.id)}` },
-    el('h3', {}, it.title),
-    it.summary ? el('p', { class: 'muted', style: undefined }, it.summary.length > 180 ? `${it.summary.slice(0, 180)}…` : it.summary) : null,
-    el('div', { class: 'meta' },
-      it.destination ? el('span', {}, it.destination) : null,
-      el('span', {}, plural(it.day_count, 'dia', 'dias')),
-      el('span', {}, plural(it.stop_count, 'paragem', 'paragens')),
-      it.travelled_month ? el('span', {}, monthLabel(it.travelled_month)) : null,
-      el('span', {}, `♥ ${it.like_count}`),
-      el('span', {}, `💬 ${it.comment_count}`),
-      el('span', {}, `por ${it.author?.display_name ?? 'Viajante'}`),
-    ),
-  )));
+  feed.replaceChildren(...data.map((it) => tripCard(it, { session, liked: liked.has(it.id) })));
 }

@@ -3,9 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://gmizaoscvwarsppcmfpr.supabase.co wss://gmizaoscvwarsppcmfpr.supabase.co https://cdn.jsdelivr.net; img-src 'self' data:; style-src 'self'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://gmizaoscvwarsppcmfpr.supabase.co wss://gmizaoscvwarsppcmfpr.supabase.co https://cdn.jsdelivr.net; img-src 'self' data: https://gmizaoscvwarsppcmfpr.supabase.co; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; base-uri 'self'; form-action 'self'">
+<meta name="color-scheme" content="light dark">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Conta · Comunidade Plan-ish</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="assets/style.css">
 <script type="module" src="assets/account.js"></script>
 </head>
@@ -14,14 +18,15 @@
 <h1>A tua conta</h1>
 <div id="status"></div>
 <section id="account" class="hidden">
-  <p class="muted" id="email"></p>
-  <p id="membership"></p>
-  <h2>O teu nome</h2>
-  <p class="name" id="name"></p>
-  <p class="muted small" id="named-by"></p>
+  <div class="hero">
+    <p class="name" id="name"></p>
+    <p class="muted small" id="named-by"></p>
+    <p class="muted small"><span id="membership"></span> <span id="email"></span></p>
+    <p class="row"><a class="btn" id="public-profile" href="#">Ver o meu perfil público</a></p>
+  </div>
   <p class="muted small">Na Comunidade ninguém escolhe o próprio nome: cada pessoa recebe um, e escolhe o nome da próxima que chegar. O email nunca aparece.</p>
   <h2>O nome do próximo viajante</h2>
-  <div id="next-name"></div>
+  <div id="next-name" class="composer"></div>
   <h2>Os teus itinerários</h2>
   <div id="mine"></div>
   <h2>Telemóveis ligados</h2>

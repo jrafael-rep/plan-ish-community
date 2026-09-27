@@ -1,4 +1,4 @@
-import { $, el, explain, header, monthLabel, notice, sb, show, signInLink } from './app.js';
+import { $, avatar, badge, el, explain, header, monthLabel, notice, sb, show, signInLink } from './app.js';
 
 const session = await header('conta');
 const status = $('status');
@@ -10,15 +10,17 @@ async function load() {
   const [{ data: profile }, { data: membership }, { data: mine }] = await Promise.all([
     sb.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle(),
     sb.from('memberships').select('tier, valid_until').maybeSingle(),
-    sb.from('itineraries').select('id, title, travelled_month, hidden').eq('author_id', session.user.id).order('created_at', { ascending: false }),
+    sb.from('itineraries').select('id, title, travelled_month, hidden, evidence').eq('author_id', session.user.id).order('created_at', { ascending: false }),
   ]);
-  $('name').textContent = profile?.display_name ?? '';
+  $('name').replaceChildren(avatar(profile?.display_name, 'lg'), el('span', {}, profile?.display_name ?? ''));
+  $('public-profile').href = `viajante.html?id=${encodeURIComponent(session.user.id)}`;
   await loadNextName();
   const active = membership && (!membership.valid_until || new Date(membership.valid_until) > new Date());
   $('membership').textContent = active ? 'Membro da Comunidade.' : 'Conta da Comunidade.';
-  $('mine').replaceChildren(...(mine?.length ? mine.map((it) => el('a', { class: 'card', href: `itinerario.html?id=${it.id}` },
-    el('strong', {}, it.title), it.hidden ? el('span', { class: 'muted small' }, ' · escondido pela moderação') : null,
-    it.travelled_month ? el('div', { class: 'muted small' }, monthLabel(it.travelled_month)) : null,
+  $('mine').replaceChildren(...(mine?.length ? mine.map((it) => el('a', { class: 'card mini', href: `itinerario.html?id=${encodeURIComponent(it.id)}` },
+    el('span', {}, el('strong', {}, it.title), it.hidden ? el('span', { class: 'muted small' }, ' · escondido pela moderação') : null,
+      it.travelled_month ? el('span', { class: 'muted small block' }, monthLabel(it.travelled_month)) : null),
+    badge(it.evidence ?? 'plan'),
   )) : [el('p', { class: 'muted' }, 'Ainda não publicaste nenhum. Publica-se a partir da app, numa viagem concluída.')]));
   await loadLinks();
   show($('account'), true);
@@ -49,7 +51,7 @@ async function loadNextName() {
   box.replaceChildren(
     el('p', { class: 'muted' }, 'Escolhe o nome que a próxima pessoa vai receber. Só escolhes uma vez.'),
     el('div', { class: 'choices' }, ...row.names.map((name) => el('button', {
-      class: 'btn', type: 'button',
+      class: 'btn chip-btn', type: 'button',
       onclick: async () => {
         if (!confirm(`Dar o nome "${name}" à próxima pessoa? Não dá para mudar depois.`)) return;
         const { error: err } = await sb.rpc('give_next_name', { p_name: name });

@@ -21,7 +21,9 @@ Site estático (GitHub Pages) sobre uma base de dados Supabase.
 ## Configurar (uma vez)
 
 1. **Base de dados**: no Supabase, *SQL Editor* → colar `supabase/001_community.sql` → *Run*;
-   depois `supabase/002_names.sql` → *Run*. Podem correr outra vez sem estragar nada.
+   depois `supabase/002_names.sql`, `supabase/003_originals_and_replies.sql` e
+   `supabase/004_budget_and_photos.sql`, por esta ordem. Podem correr outra vez sem estragar nada.
+   O 004 cria no Storage o bucket público `itinerary-photos` (fotografias até 700 KB, só JPEG).
    No telemóvel, colar ficheiros grandes corta o texto: usar as versões em partes.
 2. **Autenticação**: *Authentication → URL Configuration*
    - Site URL: `https://jrafael-rep.github.io/plan-ish-community/`
@@ -65,4 +67,9 @@ Só membros a interagir: `update public.community_settings set members_only = tr
   dados são as regras de acesso por linha em `supabase/001_community.sql`.
 - A chave secreta e a password da base de dados **nunca** entram neste repositório.
 - Testar as regras num Postgres 16 local que imita o Supabase: `sudo bash supabase/test/run.sh`
-  (52 verificações: ligar a app, publicar, likes, comentários, denúncias, membros, nomes, apagar conta).
+  (86 verificações: ligar a app, publicar, likes, comentários e respostas, denúncias, membros, nomes,
+  viagens originais, "feita por", orçamento, fotografias, apagar conta).
+- Fotografias: a app reduz cada uma para 1280 px e grava-a de novo antes de a enviar, por isso não
+  leva a localização nem outros dados que vêm dentro da foto. Quem as envia é a app, com um bilhete
+  de 30 minutos para um itinerário seu; ao trocar as fotografias, as antigas ficam no Storage sem
+  uso (limpar à mão no painel, se o espaço apertar: 1 GB no plano grátis).
