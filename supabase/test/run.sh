@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa os esquemas (001 a 009) num Postgres 16 local que imita o Supabase.
+# Testa os esquemas (001 a 011) num Postgres 16 local que imita o Supabase.
 # Uso: sudo bash supabase/test/run.sh   (precisa do utilizador postgres)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 # Os termos (esquema 7) só se exigem nos testes do fim; até lá, como antes.
@@ -277,5 +277,144 @@ expect "anon não apaga contas" 'permission denied' "$(q anon '' 'select public.
 q authenticated $A "select public.delete_my_account()" >/dev/null
 expect "apagar a conta leva tudo" '^0 3$' "$(q anon '' 'select count(*) from public.itineraries; select count(*) from public.profiles')"
 expect "apagar a conta leva os selos" '^0$' "$(adm "select count(*) from private.record_seals where user_id = '$A'")"
+
+# ------------------------------------------------ esquema 10: pontos
+link() { local r; r=$(q anon "" "select request_id||' '||secret from public.app_begin_link('$2')"); q authenticated $1 "select public.confirm_app_link('${r%% *}')" >/dev/null; q anon "" "select token from public.app_redeem_link('${r%% *}','${r##* }')"; }
+newuser() { adm "insert into auth.users(email) values ('$1@example.org') returning id" | head -1; }
+pts() { adm "select coalesce(sum(delta), 0) from private.points_ledger where user_id = '$1'${2:+ and reason = '$2'}"; }
+like() { adm "insert into public.likes(itinerary_id, user_id) select '$1', id from auth.users where email ~ '$2' on conflict do nothing" >/dev/null; }
+E=$(newuser e); ETOK=$(link $E 'E')
+F=$(newuser f); FTOK=$(link $F 'F')
+EIID=$(q anon "" "select id from public.app_publish_v2('$ETOK','Serra da Estrela','Serra da Estrela','',2,4,'2026-06','{}'::jsonb,'trip-e1', 4, 4, 100, 'test')")
+E2ID=$(q anon "" "select id from public.app_publish_v2('$ETOK','Beira Baixa','Beira Baixa','',1,3,'2026-05','{}'::jsonb,'trip-e2', 0, 0, 0, 'test')")
+adm "insert into public.itinerary_completions(itinerary_id, user_id, evidence, visited_stops, gps_stops) values ('$EIID','$E','original',4,4)" >/dev/null
+expect "pontos: nada pelo próprio itinerário" '^0$' "$(pts $E)"
+adm "delete from public.itinerary_completions where user_id = '$E'" >/dev/null
+q anon "" "select public.app_record_completion('$FTOK','$EIID', 2, 0, 0)" >/dev/null
+expect "pontos: feita sem GPS não conta" '^0$' "$(pts $E)"
+q anon "" "select public.app_record_completion('$FTOK','$EIID', 4, 4, 200)" >/dev/null
+expect "pontos: feita com GPS dá 50 ao autor" '^50$' "$(pts $E trip_done)"
+q anon "" "select public.app_record_completion('$FTOK','$EIID', 4, 4, 200)" >/dev/null
+adm "delete from public.itinerary_completions where user_id = '$F'; insert into public.itinerary_completions(itinerary_id, user_id, evidence, visited_stops, gps_stops) values ('$EIID','$F','original',4,4)" >/dev/null
+expect "pontos: a mesma conclusão nunca paga duas vezes" '^50$' "$(pts $E trip_done)"
+q anon "" "select * from public.app_review('$FTOK','$EIID',2,null)" >/dev/null
+expect "pontos: avaliação de quem fez dá 10, mesmo com poucas estrelas" '^10$' "$(pts $E review_from_doer)"
+q anon "" "select * from public.app_review('$FTOK','$EIID',5,'Mudei de ideias')" >/dev/null
+q anon "" "select * from public.app_review('$BTOK','$EIID',5,null)" >/dev/null
+expect "pontos: mudar a avaliação ou avaliar sem ter feito não dá mais" '^10$' "$(pts $E review_from_doer)"
+for n in $(seq 1 12); do q anon "" "select public.app_comment_v2('$FTOK','$EIID','Comentário $n', null)" >/dev/null; done
+expect "pontos: comentários dão no máximo 10 por dia" '^10$' "$(pts $F comment)"
+q anon "" "select public.app_comment_v2('$ETOK','$EIID','Obrigado a todos', null)" >/dev/null
+expect "pontos: comentar no próprio itinerário não dá" '^0$' "$(pts $E comment)"
+FC1=$(adm "select c.id from public.comments c join private.points_ledger l on l.reason = 'comment' and l.ref_id = c.id::text where c.author_id = '$F' order by c.created_at limit 1")
+FC2=$(adm "select c.id from public.comments c join private.points_ledger l on l.reason = 'comment' and l.ref_id = c.id::text where c.author_id = '$F' order by c.created_at desc limit 1")
+q authenticated $F "delete from public.comments where id = '$FC1'" >/dev/null
+expect "pontos: comentário apagado perde o ponto" '^9$' "$(pts $F)"
+adm "insert into private.admins(user_id) values ('$B') on conflict do nothing" >/dev/null
+q authenticated $B "select public.admin_set_hidden('comment','$FC2',true)" >/dev/null
+expect "pontos: comentário escondido pela moderação perde o ponto" '^8$' "$(pts $F)"
+q authenticated $B "select public.admin_set_hidden('comment','$FC2',false)" >/dev/null
+expect "pontos: voltar a mostrar o comentário devolve o ponto" '^9$' "$(pts $F)"
+adm "insert into auth.users(email) select 'fa' || g || '@example.org' from generate_series(1, 30) g" >/dev/null
+adm "update public.profiles set created_at = now() - interval '8 days' where id in (select id from auth.users where email ~ '^fa([1-9]|1[0-9]|2[0-5])@')" >/dev/null
+like $EIID '^fa[1-9]@'
+expect "pontos: 9 gostos ainda não dão" '^0$' "$(pts $E likes)"
+like $EIID '^fa(2[6-9]|30)@'
+expect "pontos: gostos de contas com menos de 7 dias não contam" '^0$' "$(pts $E likes)"
+like $EIID '^fa10@'
+expect "pontos: 10 gostos dão 1" '^1$' "$(pts $E likes)"
+adm "delete from public.likes where itinerary_id = '$EIID' and user_id = (select id from auth.users where email = 'fa10@example.org')" >/dev/null
+like $EIID '^fa10@'
+expect "pontos: tirar e voltar a gostar não paga outra vez" '^1$' "$(pts $E likes)"
+
+# ------------------------------------------------ esquema 11: separadores do feed
+expect "feed: recentes, o mais novo primeiro" "^$E2ID $EIID\$" "$(q anon '' "select id from public.feed_page('recent')")"
+expect "feed: popular, o mais gostado e feito" "^$EIID $E2ID\$" "$(q anon '' "select id from public.feed_page('popular')")"
+adm "update public.likes set created_at = now() - interval '40 days' where itinerary_id = '$EIID'; update public.itinerary_completions set completed_at = now() - interval '40 days' where itinerary_id = '$EIID'" >/dev/null
+like $E2ID '^fa11@'
+expect "feed: popular conta só os últimos 30 dias" "^$E2ID $EIID\$" "$(q anon '' "select id from public.feed_page('popular')")"
+expect "feed: página seguinte" "^$EIID\$" "$(q anon '' "select id from public.feed_page('recent', null, null, 1, 1)")"
+expect "feed: o filtro da prova continua" "^$EIID\$" "$(q anon '' "select id from public.feed_page('popular', 'original')")"
+expect "feed: a procura continua" "^$E2ID\$" "$(q anon '' "select id from public.feed_page('recent', null, 'BEIRA')")"
+expect "feed: meus, sem sessão, vazio" '^$' "$(q anon '' "select id from public.feed_page('mine')")"
+q authenticated $F "insert into public.likes(itinerary_id, user_id) values ('$E2ID','$F')" >/dev/null
+expect "feed: meus, os que gostei" "^$E2ID\$" "$(q authenticated $F "select id from public.feed_page('mine')")"
+expect "feed: meus, os que publiquei" "^$E2ID $EIID\$" "$(q authenticated $E "select id from public.feed_page('mine')")"
+q authenticated $F "insert into public.user_blocks(blocker_id, blocked_id) values ('$F','$E')" >/dev/null
+expect "feed: quem bloqueei não aparece" '^0\|2$' "$(q authenticated $F "select count(*) from public.feed_page('recent')")|$(q anon '' "select count(*) from public.feed_page('recent')")"
+q authenticated $F "delete from public.user_blocks where blocker_id = '$F'" >/dev/null
+expect "feed: separador inventado recusado" 'tab_invalid' "$(q anon '' "select id from public.feed_page('tudo')")"
+
+# ------------------------------------------------ pontos: máximos, moderação, gastar
+adm "update private.points_rules set every = 1 where reason = 'likes'" >/dev/null
+like $E2ID '^fa([1-9]|1[0-9]|2[0-5])@'
+expect "pontos: as regras mudam-se sem código; gostos no máximo 20 por dia" '^20$' "$(pts $E likes)"
+adm "update private.points_rules set every = 10 where reason = 'likes'" >/dev/null
+expect "pontos: o saldo é a soma" '^80$' "$(pts $E)"
+q authenticated $B "select public.admin_set_hidden('itinerary','$EIID',true)" >/dev/null
+expect "pontos: itinerário escondido tira o que ganhou com ele" '^19$' "$(pts $E)"
+expect "feed: o escondido não aparece" "^$E2ID\$" "$(q anon '' "select id from public.feed_page('recent')")"
+q authenticated $B "select public.admin_set_hidden('itinerary','$EIID',true)" >/dev/null
+expect "pontos: esconder outra vez não tira outra vez" '^19$' "$(pts $E)"
+q authenticated $B "select public.admin_set_hidden('itinerary','$EIID',false)" >/dev/null
+expect "pontos: voltar a mostrar devolve-os" '^80$' "$(pts $E)"
+FRV=$(adm "select id from public.reviews where author_id = '$F' and itinerary_id = '$EIID'")
+q authenticated $B "select public.admin_set_hidden('review','$FRV',true)" >/dev/null
+expect "pontos: avaliação escondida tira os 10" '^70$' "$(pts $E)"
+q authenticated $B "select public.admin_set_hidden('review','$FRV',false)" >/dev/null
+G=$(newuser g)
+expect "pontos: sem pontos não se troca" 'points_insufficient' "$(q authenticated $G 'select * from public.redeem_points_for_month()')"
+expect "pontos: sem pontos não se cria código" 'points_insufficient' "$(q authenticated $G 'select public.create_gift_code()')"
+expect "pontos: anon não troca" 'permission denied' "$(q anon '' 'select * from public.redeem_points_for_month()')"
+adm "insert into private.points_ledger(user_id, delta, reason, ref_id) values ('$E', 2000, 'test', 'e')" >/dev/null
+expect "trocar 500 pontos por 1 mês de membro" '^extended\|true\|1580$' "$(q authenticated $E "select outcome||'|'||(abs(extract(epoch from member_until - (now() + interval '1 month'))) < 60)||'|'||points_left from public.redeem_points_for_month()")"
+V1=$(adm "select valid_until from public.memberships where user_id = '$E'")
+q authenticated $E 'select * from public.redeem_points_for_month()' >/dev/null
+expect "o segundo mês soma ao fim do primeiro" '^t$' "$(adm "select valid_until = '$V1'::timestamptz + interval '1 month' from public.memberships where user_id = '$E'")"
+adm "update public.memberships set valid_until = now() - interval '10 days' where user_id = '$E'" >/dev/null
+q authenticated $E 'select * from public.redeem_points_for_month()' >/dev/null
+expect "membro que já tinha acabado conta a partir de hoje" '^t$' "$(adm "select abs(extract(epoch from valid_until - (now() + interval '1 month'))) < 60 from public.memberships where user_id = '$E'")"
+adm "update public.memberships set valid_until = null where user_id = '$E'" >/dev/null
+expect "membro sem fim não gasta pontos" '^no_end\|580\|t$' "$(q authenticated $E "select outcome||'|'||points_left from public.redeem_points_for_month()")|$(adm "select valid_until is null from public.memberships where user_id = '$E'")"
+CODE1=$(q authenticated $E 'select public.create_gift_code()')
+expect "código de oferta com a forma certa" '^PLAN-[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4}$' "$CODE1"
+expect "o código custa 500" '^80$' "$(pts $E)"
+expect "o código aparece a quem o criou" "^$CODE1\|false\$" "$(q authenticated $E "select code||'|'||redeemed from public.my_gift_codes()")"
+expect "usar um código dá 1 mês" '^extended\|true$' "$(q authenticated $G "select outcome||'|'||(member_until > now() + interval '27 days') from public.redeem_gift_code(lower(replace('$CODE1', '-', ' ')))")"
+expect "o código só se usa uma vez" 'gift_invalid' "$(q authenticated $F "select * from public.redeem_gift_code('$CODE1')")"
+expect "nem por quem já o usou" 'gift_invalid' "$(q authenticated $G "select * from public.redeem_gift_code('$CODE1')")"
+expect "código inventado recusado" 'gift_invalid' "$(q authenticated $F "select * from public.redeem_gift_code('PLAN-AAAA-AAAA')")"
+adm "insert into private.gift_codes(code, created_by, expires_at) values ('PLAN-2222-3333', '$E', now() - interval '1 day'), ('PLAN-4444-5555', '$E', default)" >/dev/null
+expect "código expirado recusado" 'gift_invalid' "$(q authenticated $F "select * from public.redeem_gift_code('PLAN-2222-3333')")"
+expect "membro sem fim não gasta o código" '^no_end\|f$' "$(q authenticated $E "select outcome from public.redeem_gift_code('PLAN-4444-5555')")|$(adm "select redeemed_at is not null from private.gift_codes where code = 'PLAN-4444-5555'")"
+expect "ninguém lê os movimentos nem os códigos pela API" 'permission denied.*permission denied.*permission denied' "$(q authenticated $E 'select count(*) from private.points_ledger') $(q authenticated $E 'select count(*) from private.gift_codes') $(q anon '' 'select count(*) from private.points_rules')"
+REF=$(q authenticated $E 'select public.my_ref_code()')
+expect "cada conta tem um código de convite" '^[A-HJKMNP-Z2-9]{8}$' "$REF"
+expect "o código de convite não muda" "^$REF\$" "$(q authenticated $E 'select public.my_ref_code()')"
+H=$(newuser h); HTOK=$(link $H 'H')
+I=$(newuser i); ITOK=$(link $I 'I')
+expect "convidar-se a si próprio recusado" 'ref_self' "$(q authenticated $E "select public.claim_ref('$REF')")"
+expect "convite inventado recusado" 'ref_invalid' "$(q authenticated $H "select public.claim_ref('ZZZZZZZZ')")"
+adm "update public.profiles set created_at = now() - interval '30 days' where id = '$B'" >/dev/null
+expect "contas antigas não dizem quem as convidou" 'ref_too_late' "$(q authenticated $B "select public.claim_ref('$REF')")"
+expect "quem chegou pelo convite diz quem convidou" '^ok$' "$(q authenticated $H "select 'ok' from public.claim_ref(lower('$REF'))")"
+expect "só uma vez" 'ref_already' "$(q authenticated $H "select public.claim_ref('$REF')")"
+expect "o convite sozinho não dá pontos" '^0$' "$(pts $E invite)"
+adm "insert into public.memberships(user_id, valid_until) values ('$H', now() + interval '1 month')" >/dev/null
+expect "convidado tornou-se membro: 100 para quem convidou" '^100$' "$(pts $E invite)"
+q anon "" "select public.app_record_completion('$HTOK','$EIID', 4, 4, 200)" >/dev/null
+expect "o convite paga uma vez por convidado" '^100$' "$(pts $E invite)"
+q authenticated $I "select public.claim_ref('$REF')" >/dev/null
+q anon "" "select public.app_record_completion('$ITOK','$E2ID', 3, 3, 50)" >/dev/null
+expect "convidado fez uma viagem com GPS: mais 100" '^200$' "$(pts $E invite)"
+expect "o saldo no site: soma, custos e 20 movimentos" "^$(pts $E)\|500\|500\|20\$" "$(q authenticated $E "select balance||'|'||month_cost||'|'||gift_cost||'|'||jsonb_array_length(movements) from public.my_points()")"
+expect "os movimentos não dizem quem" '^$' "$(q authenticated $E "select string_agg(k, ',') from public.my_points(), jsonb_array_elements(movements) m, jsonb_object_keys(m) k where k not in ('delta', 'reason', 'created_at', 'about')")"
+expect "anon não vê pontos" 'permission denied' "$(q anon '' 'select * from public.my_points()')"
+expect "a app não tem funções de pontos" '^0$' "$(adm "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and left(p.proname, 4) = 'app_' and p.proname ~ '(point|gift|ref)'")"
+FP=$(pts $F)
+q authenticated $E "select public.delete_my_account()" >/dev/null
+expect "apagar a conta leva os pontos e os convites" '^0\|0\|0$' "$(adm "select (select count(*) from private.points_ledger where user_id = '$E')||'|'||(select count(*) from private.ref_codes where user_id = '$E')||'|'||(select count(*) from private.referrals where inviter_id = '$E')")"
+expect "quem comentou não perde pontos quando o itinerário sai" "^$FP\$" "$(pts $F)"
+expect "um código por usar sobrevive a quem o criou" '^extended$' "$(q authenticated $F "select outcome from public.redeem_gift_code('PLAN-4444-5555')")"
 
 echo; [ $FAILS -eq 0 ] && echo "Tudo certo." || { echo "$FAILS falhas."; exit 1; }
