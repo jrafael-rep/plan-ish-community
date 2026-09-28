@@ -9,7 +9,7 @@ import {
 } from './app.js';
 import {
   addDay, addStop, buildModel, clockOf, dayLabel, durationText, moveToDay, moveWithinDay, remove,
-  setField, setStart,
+  peopleLabel, setField, setStart, setStopPeople,
 } from './plan-model.js';
 
 const session = await header('');
@@ -291,6 +291,7 @@ function stopRow(day, stop, i, others, openNotes) {
           clock ? null : el('span', { class: 'muted small' }, 'automática')),
       ),
       el('p', { class: 'muted small where' }, where),
+      model.people.length >= 2 ? peoplePicker(stop) : null,
       notes,
     ),
     el('div', { class: 'stop-tools' },
@@ -302,6 +303,26 @@ function stopRow(day, stop, i, others, openNotes) {
         onclick: () => { if (confirm(`Apagar “${stop.name ?? 'esta paragem'}”? Desaparece para todos.`)) void write(remove('stop', stop.slot)); },
       }, 'Apagar'),
     ),
+  );
+}
+
+/** Para quem é a paragem: um ramo, quando não é de todos. */
+function peoplePicker(stop) {
+  const ids = Array.isArray(stop.forParticipantIds) ? stop.forParticipantIds : [];
+  const label = peopleLabel(model, stop);
+  return el('details', { class: 'people-pick' },
+    el('summary', {}, label ? `Para quem: ${label.replace(/^Só /, 'só ')}` : 'Para quem: todos'),
+    ...model.people.map((p) => {
+      const box = el('input', { type: 'checkbox', checked: !ids.length || ids.includes(p.id) || undefined });
+      box.addEventListener('change', () => {
+        const current = ids.length ? ids : model.people.map((x) => x.id);
+        const next = box.checked ? [...current, p.id] : current.filter((x) => x !== p.id);
+        if (!next.length) { box.checked = true; return; } // alguém tem de fazer a paragem
+        void write(setStopPeople(model, stop, next));
+      });
+      return el('label', { class: 'inline' }, box, p.name);
+    }),
+    el('p', { class: 'muted small' }, 'Só de algumas pessoas é um ramo: na app, cada uma vê o seu plano, com as suas horas.'),
   );
 }
 

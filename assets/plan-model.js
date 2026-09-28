@@ -50,6 +50,9 @@ export function buildModel(fields) {
     days,
     ideas: alive(groups.idea).sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), 'pt')),
     checklist: items.filter((i) => i.slot.startsWith('ck.')).sort((a, b) => String(a.label ?? '').localeCompare(String(b.label ?? ''), 'pt')),
+    // As pessoas do plano, para "Para quem" (ramos: paragens só de algumas).
+    people: items.filter((i) => i.slot.startsWith('pp.') && typeof i.name === 'string')
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'pt')),
     stopCount: days.reduce((n, d) => n + d.stops.length, 0),
   };
 }
@@ -193,4 +196,23 @@ export function dayLabel(date) {
   if (!m) return '';
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
   return `${WEEKDAYS[d.getUTCDay()]}, ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
+/**
+ * Para quem é uma paragem: uma lista de pessoas, ou todas (a lista sai).
+ * Escolher toda a gente é o mesmo que "todas", como na app.
+ */
+export function setStopPeople(model, stop, ids) {
+  const known = new Set(model.people.map((p) => p.id));
+  const chosen = [...new Set(ids)].filter((id) => known.has(id));
+  const everyone = chosen.length === 0 || chosen.length === known.size;
+  return setField('stop', stop.slot, 'forParticipantIds', everyone ? null : chosen);
+}
+
+/** "Só Ana e Rui", ou nada numa paragem de todos. */
+export function peopleLabel(model, stop) {
+  const ids = Array.isArray(stop.forParticipantIds) ? stop.forParticipantIds : [];
+  const names = ids.map((id) => model.people.find((p) => p.id === id)?.name).filter(Boolean);
+  if (!names.length) return null;
+  return `Só ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`}`;
 }
