@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa 001_community.sql num Postgres 16 local que imita o Supabase.
+# Testa os esquemas (001 a 009) num Postgres 16 local que imita o Supabase.
 # Uso: sudo bash supabase/test/run.sh   (precisa do utilizador postgres)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 # Os termos (esquema 7) só se exigem nos testes do fim; até lá, como antes.
@@ -249,6 +249,26 @@ expect "no site, antes de apagar a conta, retira-se tudo" '^0$' "$(q authenticat
 expect "anon não retira pelo site" 'permission denied' "$(q anon '' "select public.withdraw_itinerary('$IID')")"
 expect "B não retira pelo site o de A" '^1$' "$(q authenticated $B "select public.withdraw_itinerary('$IID')" >/dev/null; adm "select count(*) from public.itineraries where id = '$IID'")"
 
+# ------------------------------------------------ esquema 9: selos do registo real
+H1=$(printf 'ab%.0s' {1..32})
+expect "selo: impressão com a forma errada recusada" 'seal_invalid' "$(q anon '' "select public.app_register_seal('$TOK','xyz')")"
+expect "selo: 63 caracteres recusados" 'seal_invalid' "$(q anon '' "select public.app_register_seal('$TOK','${H1:1}')")"
+expect "selo: sem ligação válida não se sela" 'link_invalid' "$(q anon '' "select public.app_register_seal('$(printf 'a%.0s' {1..64})','$H1')")"
+expect "selo: registar devolve a data" '^t$' "$(q anon '' "select public.app_register_seal('$TOK','$H1') <= now()")"
+adm "update private.record_seals set sealed_at = '2026-01-02 03:04:05+00' where hash = '$H1'" >/dev/null
+expect "selo: o primeiro ganha, outra conta recebe a data original" '^t$' "$(q anon '' "select public.app_register_seal('$BTOK', upper('$H1')) = '2026-01-02 03:04:05+00'::timestamptz")"
+expect "selo: a data e a conta não mudam" "^1\|$A\|true\$" "$(adm "select count(*)||'|'||min(user_id::text)||'|'||(min(sealed_at) = '2026-01-02 03:04:05+00') from private.record_seals where hash = '$H1'")"
+expect "selo: sem conta, pergunta-se a data" '^t$' "$(q anon '' "select public.seal_check('$H1') = '2026-01-02 03:04:05+00'::timestamptz")"
+expect "selo: impressão desconhecida não tem data" '^t$' "$(q anon '' "select public.seal_check('$(printf 'cd%.0s' {1..32})') is null")"
+expect "selo: anon não lê a tabela" 'permission denied' "$(q anon '' 'select count(*) from private.record_seals')"
+expect "selo: com sessão também não" 'permission denied' "$(q authenticated $A 'select count(*) from private.record_seals')"
+expect "selo: só a impressão, a conta e a data" '^hash,sealed_at,user_id$' "$(adm "select string_agg(column_name, ',' order by column_name) from information_schema.columns where table_schema = 'private' and table_name = 'record_seals'")"
+expect "selo: a verificação só devolve a data" '^timestamp with time zone$' "$(adm "select format_type(prorettype, null) from pg_proc where proname = 'seal_check'")"
+adm "insert into private.record_seals(hash, user_id) select encode(extensions.digest(g::text, 'sha256'), 'hex'), '$B' from generate_series(1, 49) g" >/dev/null
+expect "selo: o 50.º do dia passa" '^t$' "$(q anon '' "select public.app_register_seal('$BTOK','$(printf 'ef%.0s' {1..32})') is not null")"
+expect "selo: o 51.º fica para amanhã" 'seal_limit' "$(q anon '' "select public.app_register_seal('$BTOK','$(printf '12%.0s' {1..32})')")"
+expect "selo: o que já está selado responde sempre" '^t$' "$(q anon '' "select public.app_register_seal('$BTOK','$H1') is not null")"
+
 adm "update public.itineraries set hidden = true where id = '$IID'"
 expect "escondido some do feed" '^0$' "$(q anon '' "select count(*) from public.itineraries where id = '$IID'")"
 expect "o autor ainda o vê" '^1$' "$(q authenticated $A "select count(*) from public.itineraries where id = '$IID'")"
@@ -256,5 +276,6 @@ expect "desligar invalida a chave" 'link_invalid' "$(q anon '' "select public.ap
 expect "anon não apaga contas" 'permission denied' "$(q anon '' 'select public.delete_my_account()')"
 q authenticated $A "select public.delete_my_account()" >/dev/null
 expect "apagar a conta leva tudo" '^0 3$' "$(q anon '' 'select count(*) from public.itineraries; select count(*) from public.profiles')"
+expect "apagar a conta leva os selos" '^0$' "$(adm "select count(*) from private.record_seals where user_id = '$A'")"
 
 echo; [ $FAILS -eq 0 ] && echo "Tudo certo." || { echo "$FAILS falhas."; exit 1; }
