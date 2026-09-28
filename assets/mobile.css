@@ -1,0 +1,9 @@
+/* Comunidade Plan-ish: só o telemóvel (<html data-layout="mobile">).
+   Tudo aqui fica dentro de [data-layout="mobile"], para não mexer no PC. */
+
+/* Uma fila de filtros que passa do ecrã desvanece na ponta: vê-se que há mais. */
+[data-layout="mobile"] .tabs {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 2.5rem), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 2.5rem), transparent);
+  padding-right: 2rem;
+}

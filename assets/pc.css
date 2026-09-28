@@ -1,0 +1,8 @@
+/* Comunidade Plan-ish: só o PC e o tablet (<html data-layout="pc|tablet">).
+   Tudo aqui fica dentro de [data-layout=…], para não mexer no telemóvel. */
+
+/* Com rato, o cartão mostra que se pode abrir. */
+@media (hover: hover) {
+  :root:is([data-layout="pc"], [data-layout="tablet"]) .trip { transition: box-shadow .2s var(--ease), transform .2s var(--ease); }
+  :root:is([data-layout="pc"], [data-layout="tablet"]) .trip:hover { box-shadow: 0 1px 2px rgba(12, 31, 42, .08), 0 14px 32px -12px rgba(12, 31, 42, .28); }
+}

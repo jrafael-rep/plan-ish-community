@@ -1,10 +1,11 @@
 import { $, avatar, badge, el, explain, header, notice, plural, photoUrl, sb, who } from './app.js';
 import { missingColumn, routeCover } from './card.js';
+import { profileSkeleton } from './layout/shared/skeleton.js';
 
 const session = await header('');
 const status = $('status');
 const id = new URLSearchParams(location.search).get('id') ?? '';
-notice(status, 'A carregar…');
+status.replaceChildren(profileSkeleton());
 
 const TILE = 'id, title, destination, day_count, evidence, photos, plan, like_count';
 const BASIC_TILE = 'id, title, destination, day_count, plan, like_count';

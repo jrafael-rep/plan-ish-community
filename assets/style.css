@@ -1,52 +1,7 @@
-/* Comunidade Plan-ish — feed social de viagens. Ver DESIGN.md.
-   Paleta "Brisa", a mesma da página da app e da família dos temas da app
-   ("brisa" e "brisa-noite"): claro por defeito, em verde-água com cor; escuro com o botão do topo (data-theme="dark",
-   guardado em assets/theme.js e partilhado com a página da app). */
-:root {
-  color-scheme: light;
-  --bg: #D5E7E6;
-  --surface: #F4FAF9;
-  --surface-2: #C7DEDD;
-  --line: #A9C6C5;
-  --text: #0A1D26;
-  --muted: #324C57;
-  --accent: #075F68;
-  --accent-strong: #054950;
-  --accent-ink: #FFFFFF;
-  --accent-soft: #C3E6E1;
-  --verified: #0A6A43;
-  --verified-soft: #CDEBDD;
-  --done: #2554A8;
-  --done-soft: #D6E1F5;
-  --like: #B51A4B;
-  --danger: #A61E14;
-  --r: 18px;
-  --r-sm: 12px;
-  --shadow: 0 1px 2px rgba(12, 31, 42, .06), 0 6px 20px -8px rgba(12, 31, 42, .18);
-  --ease: cubic-bezier(.2, .8, .2, 1);
-  --font: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #0E1B26;
-  --surface: #152634;
-  --surface-2: #1D3242;
-  --line: #2B4659;
-  --text: #EAF3F8;
-  --muted: #A2B9C8;
-  --accent: #45D1D0;
-  --accent-strong: #74DEDD;
-  --accent-ink: #04191A;
-  --accent-soft: #143E45;
-  --verified: #3DDC97;
-  --verified-soft: #12392E;
-  --done: #85B9FF;
-  --done-soft: #1B3352;
-  --like: #FF7A95;
-  --danger: #FF7E7E;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 28px -12px rgba(0, 0, 0, .55);
-}
-
+/* Comunidade Plan-ish: base partilhada pelos três layouts. Ver DESIGN.md.
+   Ordem das folhas: tokens.css → style.css (esta) → pc.css e mobile.css, que
+   só têm regras dentro do seu [data-layout] e por isso não se estragam uma à
+   outra. */
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 400 1rem/1.55 var(--font); overflow-x: clip; }
@@ -55,8 +10,8 @@ a:hover { color: var(--accent-strong); }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 img, svg { display: block; }
 h1, h2, h3 { line-height: 1.2; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
-h1 { font-size: clamp(1.6rem, 1.3rem + 1.4vw, 2.1rem); font-weight: 800; }
-h2 { font-size: 1.2rem; font-weight: 750; }
+h1 { font-size: var(--fs-h1); font-weight: 800; }
+h2 { font-size: var(--fs-h2); font-weight: 750; }
 p { margin: 0 0 .75rem; }
 .muted { color: var(--muted); }
 .small { font-size: .9rem; }
@@ -64,7 +19,7 @@ p { margin: 0 0 .75rem; }
 .hidden { display: none !important; }
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.wrap { max-width: 44rem; margin: 0 auto; padding-inline: 1rem; }
+.wrap { max-width: 44rem; margin: 0 auto; padding-inline: var(--safe-l) var(--safe-r); }
 .feed-wrap { max-width: 38rem; }
 main.wrap { padding-block: 1.25rem 4rem; }
 main > h1 { margin-bottom: 1rem; }
@@ -121,7 +76,7 @@ input, textarea {
   width: 100%; font: 400 1rem/1.5 var(--font); color: var(--text); background: var(--surface);
   border: 1px solid var(--line); border-radius: var(--r-sm); padding: .7rem .9rem; min-height: 46px;
 }
-input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 textarea { min-height: 5.5rem; resize: vertical; }
 ::placeholder { color: var(--muted); opacity: .85; }
 label { display: block; font-weight: 700; margin: 0 0 .35rem; }
@@ -206,7 +161,7 @@ label { display: block; font-weight: 700; margin: 0 0 .35rem; }
 @media (hover: none) { .media .nav { display: none; } }
 
 .trip-body { padding: .9rem 1rem .2rem; }
-.trip-title { font-size: 1.25rem; font-weight: 800; }
+.trip-title { font-size: var(--fs-title); font-weight: 800; }
 h1.trip-title { font-size: clamp(1.45rem, 1.2rem + 1.2vw, 1.9rem); }
 .trip-title a { color: var(--text); text-decoration: none; }
 .trip-title a:hover { color: var(--accent); }
@@ -344,7 +299,7 @@ section h2 { margin-top: 1.75rem; margin-bottom: .6rem; }
 .prose h2 { margin: 1.6rem 0 .5rem; }
 .prose ul { padding-left: 1.2rem; }
 .prose li { margin: .35rem 0; }
-footer { border-top: 1px solid var(--line); padding: 1.5rem 0 3rem; color: var(--muted); font-size: .88rem; }
+footer { border-top: 1px solid var(--line); padding: 1.5rem 0 calc(3rem + var(--safe-b)); color: var(--muted); font-size: .88rem; }
 footer .wrap { max-width: 38rem; }
 footer a { color: var(--muted); }
 
@@ -474,3 +429,28 @@ dialog.terms-dialog h2 { margin-bottom: .6rem; }
 .people-pick { margin-top: .25rem; }
 .people-pick summary { cursor: pointer; font-size: .9rem; color: var(--muted, inherit); }
 .people-pick label.inline { display: inline-flex; gap: .35rem; align-items: center; margin: .35rem .9rem 0 0; min-height: 44px; }
+
+/* Números que se comparam ou mudam (gostos, dias, paragens, estatísticas) não dançam. */
+.act, .fact, .media-facts, .trip-meta, .stop-meta, .stat b, .rating-all, .day-n, .when { font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------- esqueletos
+   Enquanto carrega, a forma do que vem a seguir, e não uma caixa "A carregar…". */
+.sk { display: block; background: var(--surface-2); border-radius: 8px; position: relative; overflow: hidden; }
+.sk::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 55%, transparent), transparent);
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { to { transform: translateX(100%); } }
+.sk-line { height: .9rem; margin: .5rem 0; }
+.sk-line.title { height: 1.35rem; width: 70%; }
+.sk-line.short { width: 40%; }
+.sk-round { border-radius: 50%; }
+.sk-pill { border-radius: 999px; height: 1.7rem; width: 7rem; }
+.skeleton { pointer-events: none; }
+.skeleton .media { background: none; }
+.skeleton .media .sk { position: absolute; inset: 0; border-radius: 0; }
+
+.grow { flex: 1; min-width: 0; }
+.skeleton .tile::after { display: none; }
+.skeleton .tile .sk { position: absolute; inset: 0; border-radius: 0; }

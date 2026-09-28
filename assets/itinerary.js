@@ -3,6 +3,7 @@ import {
   who, withdrawItinerary, withTerms, WITHDRAW_WARNING,
 } from './app.js';
 import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, RATING_INFO, tripCard } from './card.js';
+import { cardsLoading } from './layout/shared/skeleton.js';
 
 const session = await header('');
 const me = session?.user.id ?? null;
@@ -10,7 +11,7 @@ const me = session?.user.id ?? null;
 const blocked = await blockedSet(session);
 const status = $('status');
 const id = new URLSearchParams(location.search).get('id') ?? '';
-notice(status, 'A carregar…');
+status.replaceChildren(cardsLoading(1));
 
 let { data: it, error } = await sb.from('itineraries').select(CARD_COLUMNS).eq('id', id).maybeSingle();
 if (missingColumn(error)) ({ data: it, error } = await sb.from('itineraries').select(BASIC_COLUMNS).eq('id', id).maybeSingle());

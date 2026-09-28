@@ -238,6 +238,7 @@ function modeButton() {
     button.setAttribute('aria-pressed', String(dark));
     button.replaceChildren(icon(dark ? 'sun' : 'moon'));
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0E1B26' : '#D5E7E6');
+    document.querySelector('meta[name="color-scheme"]')?.setAttribute('content', dark ? 'dark' : 'light');
   };
   button.addEventListener('click', () => {
     if (root.dataset.theme === 'dark') delete root.dataset.theme; else root.dataset.theme = 'dark';

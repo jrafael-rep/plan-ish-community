@@ -1,0 +1,76 @@
+/* Comunidade Plan-ish: tokens (cores, forma, tipo e margens).
+   Paleta "Brisa", a mesma da página da app e da família dos temas da app
+   ("brisa" e "brisa-noite"): claro por defeito, em verde-água com cor; escuro
+   com o botão do topo (data-theme="dark", ver assets/theme.js).
+
+   A escala de tipo e as margens mudam com o layout (<html data-layout>, também
+   em assets/theme.js): o PC tem mais ar e títulos maiores, o telemóvel margens
+   de polegar e texto que não obriga a aproximar. */
+:root {
+  color-scheme: light;
+  --bg: #D5E7E6;
+  --surface: #F4FAF9;
+  --surface-2: #C7DEDD;
+  --line: #A9C6C5;
+  --text: #0A1D26;
+  --muted: #324C57;
+  --accent: #075F68;
+  --accent-strong: #054950;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #C3E6E1;
+  --verified: #0A6A43;
+  --verified-soft: #CDEBDD;
+  --done: #2554A8;
+  --done-soft: #D6E1F5;
+  --like: #B51A4B;
+  --danger: #A61E14;
+  --r: 18px;
+  --r-sm: 12px;
+  --shadow: 0 1px 2px rgba(12, 31, 42, .06), 0 6px 20px -8px rgba(12, 31, 42, .18);
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --font: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0E1B26;
+  --surface: #152634;
+  --surface-2: #1D3242;
+  --line: #2B4659;
+  --text: #EAF3F8;
+  --muted: #A2B9C8;
+  --accent: #45D1D0;
+  --accent-strong: #74DEDD;
+  --accent-ink: #04191A;
+  --accent-soft: #143E45;
+  --verified: #3DDC97;
+  --verified-soft: #12392E;
+  --done: #85B9FF;
+  --done-soft: #1B3352;
+  --like: #FF7A95;
+  --danger: #FF7E7E;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 28px -12px rgba(0, 0, 0, .55);
+}
+
+/* ------------------------------------------------ tipo e margens por layout */
+:root {
+  --gutter: 1rem;
+  --page-max: 44rem;
+  --fs-h1: clamp(1.6rem, 1.3rem + 1.4vw, 2.1rem);
+  --fs-h2: 1.2rem;
+  --fs-title: 1.25rem;
+  --safe-l: max(var(--gutter), env(safe-area-inset-left));
+  --safe-r: max(var(--gutter), env(safe-area-inset-right));
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+:root[data-layout="tablet"] {
+  --gutter: 1.5rem;
+  --fs-h1: 2.1rem;
+  --fs-h2: 1.25rem;
+}
+:root[data-layout="pc"] {
+  --gutter: 2rem;
+  --page-max: 80rem;
+  --fs-h1: 2.4rem;
+  --fs-h2: 1.3rem;
+  --fs-title: 1.3rem;
+}

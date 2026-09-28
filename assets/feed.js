@@ -1,9 +1,13 @@
-import { $, el, explain, header, notice, sb } from './app.js';
-import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, tripCard } from './card.js';
+import { $, el, explain, header, notice } from './app.js';
+import { likedSet, tripCard } from './card.js';
+import { feedPage, feedUrl, PAGE, readFeedUrl, searchTerm } from './data/feed.js';
+import { cardsLoading } from './layout/shared/skeleton.js';
 
 const session = await header('feed');
 const status = $('status');
 const feed = $('feed');
+// O que mudou, dito a quem usa leitor de ecrã (o feed muda sem recarregar).
+const said = $('said');
 
 const EMPTY = {
   '': 'Ainda não há viagens publicadas. A primeira pode ser a tua: no Plan-ish, abre uma viagem concluída e escolhe "Publicar na Comunidade".',
@@ -14,89 +18,82 @@ const EMPTY = {
 
 const EMPTY_MINE = 'Ainda não tens nada aqui. Os itinerários que publicares e as viagens de que gostares aparecem neste separador.';
 
-const PAGE = 20;
-let view = 'popular';
-let level = '';
-let words = '';
-/** Sem o esquema 11 não há feed_page: o feed lê a tabela, como antes. */
-let viaServer = true;
+// O estado começa no URL: um link partilhado, recarregar ou voltar atrás mostram o mesmo.
+let { view, level, words } = readFeedUrl();
+if (view === 'mine' && !session) view = 'popular';
 let shown = [];
 /** Only the newest request fills the feed: tabs switch faster than the network. */
 let request = 0;
 const more = el('button', { class: 'btn more-btn', type: 'button', hidden: true, onclick: () => void load(true) }, 'Ver mais viagens');
 feed.after(more);
 
-for (const tab of document.querySelectorAll('.tab')) {
-  tab.addEventListener('click', () => {
-    for (const other of document.querySelectorAll('.tab')) other.setAttribute('aria-pressed', String(other === tab));
-    level = tab.dataset.level ?? '';
-    void load(false);
-  });
-}
-for (const button of document.querySelectorAll('.view')) {
-  // "Meus" só com sessão: os meus e os de que gostei.
-  if (button.dataset.view === 'mine') button.hidden = !session;
-  button.addEventListener('click', () => {
-    for (const other of document.querySelectorAll('.view')) other.setAttribute('aria-pressed', String(other === button));
-    view = button.dataset.view ?? 'popular';
-    void load(false);
-  });
+const tabs = [...document.querySelectorAll('.tab')];
+const views = [...document.querySelectorAll('.view')];
+const search = $('search');
+
+/** Os botões e a pesquisa a mostrar o estado atual. */
+function paint() {
+  for (const tab of tabs) tab.setAttribute('aria-pressed', String((tab.dataset.level ?? '') === level));
+  for (const button of views) button.setAttribute('aria-pressed', String(button.dataset.view === view));
+  if (searchTerm(search.value) !== words) search.value = words;
 }
 
-// Procura depois de uma pausa na escrita, não a cada letra.
+/** Muda o estado, guarda-o no URL e volta a carregar. */
+function go(next, { push = true } = {}) {
+  ({ view, level, words } = { view, level, words, ...next });
+  const url = feedUrl({ view, level, words });
+  if (push) history.pushState(null, '', url); else history.replaceState(null, '', url);
+  paint();
+  void load(false);
+}
+
+for (const tab of tabs) tab.addEventListener('click', () => go({ level: tab.dataset.level ?? '' }));
+for (const button of views) {
+  // "Meus" só com sessão: os meus e os de que gostei.
+  if (button.dataset.view === 'mine') button.hidden = !session;
+  button.addEventListener('click', () => go({ view: button.dataset.view ?? 'popular' }));
+}
+
+// Procura depois de uma pausa na escrita, não a cada letra. A escrita não
+// enche o histórico: cada letra substitui a anterior.
 let typing = 0;
-$('search').addEventListener('input', () => {
+search.addEventListener('input', () => {
   clearTimeout(typing);
   typing = setTimeout(() => {
-    const next = searchTerm($('search').value);
-    if (next === words) return;
-    words = next;
-    void load(false);
+    const next = searchTerm(search.value);
+    if (next !== words) go({ words: next }, { push: false });
   }, 400);
 });
 
-/** Letras, números, espaços, hífenes e apóstrofos: vírgulas e parênteses mudariam o filtro. */
-function searchTerm(text) {
-  return text.replace(/[^\p{L}\p{N} '-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
-}
+addEventListener('popstate', () => {
+  ({ view, level, words } = readFeedUrl());
+  if (view === 'mine' && !session) view = 'popular';
+  paint();
+  void load(false);
+});
 
+paint();
 await load(false);
 
 async function load(append) {
   const mine = ++request;
   const from = append ? shown.length : 0;
-  if (append) { more.disabled = true; more.textContent = 'A carregar…'; } else { notice(status, 'A carregar…'); more.hidden = true; }
-  // O servidor ordena cada separador e tira o escondido e quem bloqueei; as
-  // colunas e o autor pedem-se como numa leitura da tabela.
-  const server = () => sb.rpc('feed_page', {
-    p_tab: view, p_level: level || null, p_search: words || null, p_offset: from, p_limit: PAGE,
-  }).select(CARD_COLUMNS);
-  // Antes do esquema 11. O id desempata: uma página nunca repete nem salta viagens publicadas no mesmo instante.
-  const table = (columns, basic) => {
-    let query = sb.from('itineraries').select(columns);
-    if (view === 'popular') query = query.order('like_count', { ascending: false });
-    if (view === 'mine') query = query.eq('author_id', session?.user.id ?? '');
-    query = query.order('created_at', { ascending: false }).order('id', { ascending: false })
-      .range(from, from + PAGE - 1);
-    if (level && !basic) query = query.eq('evidence', level);
-    if (words) query = query.or(`title.ilike.*${words}*,destination.ilike.*${words}*`);
-    return query;
-  };
-  let data;
-  let error;
-  if (viaServer) {
-    ({ data, error } = await server());
-    if (missingFunction(error)) viaServer = false;
+  if (append) {
+    more.disabled = true; more.textContent = 'A carregar…';
+  } else {
+    status.replaceChildren();
+    more.hidden = true;
+    feed.setAttribute('aria-busy', 'true');
+    feed.replaceChildren(cardsLoading(2));
   }
-  if (!viaServer) {
-    ({ data, error } = await table(CARD_COLUMNS, false));
-    if (missingColumn(error)) ({ data, error } = await table(BASIC_COLUMNS, true));
-  }
+  const { data, error } = await feedPage({ view, level, words, from, userId: session?.user.id ?? null });
   if (mine !== request) return;
+  feed.removeAttribute('aria-busy');
   more.disabled = false; more.textContent = 'Ver mais viagens';
   if (error) {
-    if (append) { notice(status, explain(error), 'error'); return; }
-    feed.replaceChildren(); notice(status, explain(error), 'error'); return;
+    if (!append) feed.replaceChildren();
+    notice(status, explain(error), 'error');
+    return;
   }
   if (!append && !data.length) {
     feed.replaceChildren();
@@ -113,8 +110,7 @@ async function load(append) {
   const cards = fresh.map((it) => tripCard(it, { session, liked: liked.has(it.id) }));
   if (append) feed.append(...cards); else feed.replaceChildren(...cards);
   more.hidden = data.length < PAGE;
-}
-
-function missingFunction(error) {
-  return error?.code === 'PGRST202' || error?.code === '42883';
+  said.textContent = append
+    ? `Mais ${fresh.length === 1 ? '1 viagem' : `${fresh.length} viagens`}.`
+    : `${shown.length === 1 ? '1 viagem' : `${shown.length} viagens`}${words ? ` com "${words}"` : ''}.`;
 }
