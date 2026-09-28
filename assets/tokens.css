@@ -64,6 +64,7 @@
 }
 :root[data-layout="tablet"] {
   --gutter: 1.5rem;
+  --page-max: 64rem;
   --fs-h1: 2.1rem;
   --fs-h2: 1.25rem;
 }

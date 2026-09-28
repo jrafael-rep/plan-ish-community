@@ -1,8 +1,88 @@
 /* Comunidade Plan-ish: só o PC e o tablet (<html data-layout="pc|tablet">).
    Tudo aqui fica dentro de [data-layout=…], para não mexer no telemóvel. */
 
+:root:is([data-layout="pc"], [data-layout="tablet"]) {
+  --top-h: 3.6rem;
+}
+
 /* Com rato, o cartão mostra que se pode abrir. */
 @media (hover: hover) {
-  :root:is([data-layout="pc"], [data-layout="tablet"]) .trip { transition: box-shadow .2s var(--ease), transform .2s var(--ease); }
+  :root:is([data-layout="pc"], [data-layout="tablet"]) .trip { transition: box-shadow .2s var(--ease); }
   :root:is([data-layout="pc"], [data-layout="tablet"]) .trip:hover { box-shadow: 0 1px 2px rgba(12, 31, 42, .08), 0 14px 32px -12px rgba(12, 31, 42, .28); }
 }
+/* O cartão escolhido com o teclado (j / k) vê-se de longe. */
+:root[data-layout="pc"] .trip:focus-within { box-shadow: 0 0 0 3px var(--accent), var(--shadow); }
+
+/* ------------------------------------------------ explorar: três zonas
+   Navegação · feed numa coluna de leitura · filtros. O cabeçalho e o rodapé
+   usam a mesma largura, para tudo alinhar. */
+:root:is([data-layout="pc"], [data-layout="tablet"]) .page-explore header.top .wrap,
+:root:is([data-layout="pc"], [data-layout="tablet"]) .page-explore footer .wrap { max-width: var(--page-max); padding-inline: var(--gutter); }
+
+:root:is([data-layout="pc"], [data-layout="tablet"]) .explore.wide {
+  display: grid; align-items: start; gap: 2rem;
+  max-width: var(--page-max); margin: 0 auto; padding: 1.75rem var(--gutter) 4rem;
+}
+:root[data-layout="pc"] .explore.wide { grid-template-columns: 13rem minmax(0, 40rem) 18.5rem; justify-content: center; }
+@media (max-width: 1279px) {
+  :root[data-layout="pc"] .explore.wide { grid-template-columns: 11rem minmax(0, 1fr) 16.5rem; gap: 1.5rem; }
+}
+:root[data-layout="tablet"] .explore.wide { grid-template-columns: minmax(0, 1fr) 16.5rem; gap: 1.5rem; }
+:root[data-layout="tablet"] .explore-nav { display: none; }
+
+.explore.wide .explore-feed { max-width: none; margin: 0; padding: 0; }
+/* Os filtros da prova vivem no painel; a fila de botões e os ✕ são do telemóvel. */
+.explore.wide .feed-top .tabs, .explore.wide .active-filters { display: none; }
+.explore.wide .feed-top h1 { font-size: var(--fs-h1); }
+.explore.wide .feed-top p { max-width: 60ch; }
+.explore.wide .search { margin-bottom: 0; }
+
+.explore-nav, .explore-rail {
+  position: sticky; top: calc(var(--top-h) + 1.75rem);
+  max-height: calc(100dvh - var(--top-h) - 3.5rem); overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* Navegação à esquerda. */
+.explore-nav { display: grid; gap: .15rem; align-content: start; padding-top: .2rem; }
+.nav-item {
+  display: flex; align-items: center; gap: .7rem; min-height: 44px; padding: 0 .8rem; border-radius: 12px;
+  color: var(--muted); font: 700 .98rem/1.2 var(--font); text-decoration: none; background: none; border: 0; cursor: pointer; text-align: left;
+}
+.nav-item svg { width: 20px; height: 20px; flex: none; }
+.nav-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-item[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+.explore-nav hr { border: 0; border-top: 1px solid var(--line); width: 100%; margin: .8rem 0; }
+.nav-note { color: var(--muted); font-size: .88rem; line-height: 1.45; margin: 0 .8rem .4rem; }
+
+/* Painel dos filtros à direita. */
+.explore-rail { display: grid; gap: 1rem; align-content: start; }
+.rail-card { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 1rem 1rem 1.1rem; }
+.rail-card h2 { font-size: 1.05rem; display: flex; align-items: center; gap: .4rem; }
+.rail-card h2 svg { width: 18px; height: 18px; color: var(--verified); }
+.rail-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-height: 36px; }
+.small-btn { min-height: 36px; font-size: .88rem; }
+.rail-card h3 { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 1rem 0 .4rem; }
+.opts { display: grid; gap: .15rem; }
+.opts.months { grid-template-columns: 1fr 1fr; gap: .25rem; }
+.opt, .place {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%;
+  min-height: 38px; padding: 0 .7rem; border: 0; border-radius: 10px; background: none; cursor: pointer;
+  color: var(--text); font: 600 .94rem/1.2 var(--font); text-align: left;
+}
+.opt:hover, .place:hover { background: var(--surface-2); }
+.opt[aria-pressed="true"], .place[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 750; }
+.count { color: var(--muted); font-size: .86rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.opt[aria-pressed="true"] .count, .place[aria-pressed="true"] .count { color: inherit; opacity: .85; }
+.months .opt span:first-child::first-letter { text-transform: uppercase; }
+.places { list-style: none; margin: .5rem 0 0; padding: 0; display: grid; gap: .1rem; }
+.place { justify-content: flex-start; }
+.place svg { width: 17px; height: 17px; color: var(--muted); flex: none; }
+.place span:not(.count) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.place[aria-pressed="true"] svg { color: inherit; }
+.rail-card.note p { color: var(--muted); font-size: .9rem; margin: .45rem 0 0; }
+
+/* No PC, a navegação da esquerda já diz onde se está: o cabeçalho fica com a conta e o tema. */
+:root[data-layout="pc"] .page-explore header.top nav a[aria-current="page"] { display: none; }
+/* Numa coluna de 640 px, a capa 4:3 ocupava o ecrã: 16:10 deixa ver o título. */
+.explore.wide .media { aspect-ratio: 16 / 10; }

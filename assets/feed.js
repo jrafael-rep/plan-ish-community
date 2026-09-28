@@ -1,7 +1,9 @@
 import { $, el, explain, header, notice } from './app.js';
 import { likedSet, tripCard } from './card.js';
-import { feedPage, feedUrl, PAGE, readFeedUrl, searchTerm } from './data/feed.js';
+import { DAY_LABEL, feedPage, feedUrl, MONTHS, PAGE, readFeedUrl, searchTerm } from './data/feed.js';
 import { cardsLoading } from './layout/shared/skeleton.js';
+import { mountExplore } from './layout/pc/explore.js';
+import { feedKeys } from './layout/pc/keys.js';
 
 const session = await header('feed');
 const status = $('status');
@@ -18,9 +20,13 @@ const EMPTY = {
 
 const EMPTY_MINE = 'Ainda não tens nada aqui. Os itinerários que publicares e as viagens de que gostares aparecem neste separador.';
 
-// O estado começa no URL: um link partilhado, recarregar ou voltar atrás mostram o mesmo.
-let { view, level, words } = readFeedUrl();
-if (view === 'mine' && !session) view = 'popular';
+/** O estado do feed. Começa no URL: um link partilhado, recarregar ou voltar atrás mostram o mesmo. */
+const state = fromUrl();
+function fromUrl() {
+  const s = readFeedUrl();
+  if (s.view === 'mine' && !session) s.view = 'popular';
+  return s;
+}
 let shown = [];
 /** Only the newest request fills the feed: tabs switch faster than the network. */
 let request = 0;
@@ -30,20 +36,35 @@ feed.after(more);
 const tabs = [...document.querySelectorAll('.tab')];
 const views = [...document.querySelectorAll('.view')];
 const search = $('search');
+const active = $('active-filters');
+
+/** Os filtros de dias e de mês que vieram no URL, com um ✕ (o telemóvel ainda não tem o painel). */
+function activeChips() {
+  const chip = (text, clear) => el('button', { class: 'chip-clear', type: 'button', 'aria-label': `Tirar o filtro ${text}`, onclick: () => go(clear) },
+    text, el('span', { 'aria-hidden': 'true' }, '✕'));
+  active.replaceChildren(...[
+    state.days ? chip(DAY_LABEL[state.days], { days: '' }) : null,
+    state.month ? chip(MONTHS[state.month - 1], { month: null }) : null,
+  ].filter(Boolean));
+}
 
 /** Os botões e a pesquisa a mostrar o estado atual. */
 function paint() {
-  for (const tab of tabs) tab.setAttribute('aria-pressed', String((tab.dataset.level ?? '') === level));
-  for (const button of views) button.setAttribute('aria-pressed', String(button.dataset.view === view));
-  if (searchTerm(search.value) !== words) search.value = words;
+  for (const tab of tabs) tab.setAttribute('aria-pressed', String((tab.dataset.level ?? '') === state.level));
+  for (const button of views) button.setAttribute('aria-pressed', String(button.dataset.view === state.view));
+  if (searchTerm(search.value) !== state.words) search.value = state.words;
+  activeChips();
+  explore?.paint(state);
 }
 
 /** Muda o estado, guarda-o no URL e volta a carregar. */
 function go(next, { push = true } = {}) {
-  ({ view, level, words } = { view, level, words, ...next });
-  const url = feedUrl({ view, level, words });
+  const wordsBefore = state.words;
+  Object.assign(state, next);
+  const url = feedUrl(state);
   if (push) history.pushState(null, '', url); else history.replaceState(null, '', url);
   paint();
+  if (state.words !== wordsBefore) explore?.facets(state);
   void load(false);
 }
 
@@ -61,16 +82,38 @@ search.addEventListener('input', () => {
   clearTimeout(typing);
   typing = setTimeout(() => {
     const next = searchTerm(search.value);
-    if (next !== words) go({ words: next }, { push: false });
+    if (next !== state.words) go({ words: next }, { push: false });
   }, 400);
 });
 
 addEventListener('popstate', () => {
-  ({ view, level, words } = readFeedUrl());
-  if (view === 'mine' && !session) view = 'popular';
+  const wordsBefore = state.words;
+  Object.assign(state, fromUrl());
   paint();
+  if (state.words !== wordsBefore) explore?.facets(state);
   void load(false);
 });
+
+/*
+  O PC e o tablet têm o painel dos filtros e a navegação ao lado; o telemóvel
+  não os desenha (nem pede as contagens). Cruzar o limite monta ou desmonta.
+*/
+let explore = null;
+let keys = null;
+function arrange(layout) {
+  const wide = layout === 'pc' || layout === 'tablet';
+  if (wide && !explore) {
+    explore = mountExplore({ state, go, session });
+    explore.facets(state);
+  } else if (!wide && explore) {
+    explore.unmount();
+    explore = null;
+  }
+  if (layout === 'pc' && !keys) keys = feedKeys({ feed, search });
+  else if (layout !== 'pc' && keys) { keys.stop(); keys = null; }
+}
+arrange(document.documentElement.dataset.layout);
+addEventListener('planish:layout', (e) => arrange(e.detail));
 
 paint();
 await load(false);
@@ -86,7 +129,8 @@ async function load(append) {
     feed.setAttribute('aria-busy', 'true');
     feed.replaceChildren(cardsLoading(2));
   }
-  const { data, error } = await feedPage({ view, level, words, from, userId: session?.user.id ?? null });
+  const { view, level, words, days, month } = state;
+  const { data, error } = await feedPage({ view, level, words, days, month, from, userId: session?.user.id ?? null });
   if (mine !== request) return;
   feed.removeAttribute('aria-busy');
   more.disabled = false; more.textContent = 'Ver mais viagens';
@@ -97,8 +141,16 @@ async function load(append) {
   }
   if (!append && !data.length) {
     feed.replaceChildren();
-    notice(status, words ? `Nenhuma viagem com "${words}" no título ou no destino.`
-      : view === 'mine' && !level ? EMPTY_MINE : EMPTY[level] ?? EMPTY['']);
+    if (words || days || month) {
+      const what = words && !days && !month ? `Nenhuma viagem com "${words}" no título ou no destino.` : 'Nenhuma viagem com estes filtros.';
+      status.replaceChildren(el('div', { class: 'notice empty', role: 'status' },
+        el('p', {}, what),
+        el('button', { class: 'btn', type: 'button', onclick: () => go({ words: '', level: '', days: '', month: null }) },
+          'Ver todas as viagens')));
+    } else {
+      notice(status, view === 'mine' && !level ? EMPTY_MINE : EMPTY[level] ?? EMPTY['']);
+    }
+    said.textContent = 'Nenhuma viagem.';
     return;
   }
   const liked = await likedSet(session, data.map((it) => it.id));

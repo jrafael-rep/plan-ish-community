@@ -454,3 +454,22 @@ dialog.terms-dialog h2 { margin-bottom: .6rem; }
 .grow { flex: 1; min-width: 0; }
 .skeleton .tile::after { display: none; }
 .skeleton .tile .sk { position: absolute; inset: 0; border-radius: 0; }
+
+/* ------------------------------------------------------------ explorar
+   No telemóvel, a coluna do feed de sempre. No PC e no tablet, pc.css põe a
+   navegação e os filtros ao lado (.explore.wide). */
+.explore-feed { max-width: 38rem; margin: 0 auto; padding: 1.25rem var(--safe-r) 4rem var(--safe-l); }
+.active-filters { display: flex; flex-wrap: wrap; gap: .4rem; }
+.active-filters:not(:empty) { margin-top: .6rem; }
+.chip-clear {
+  display: inline-flex; align-items: center; gap: .45rem; min-height: 40px; padding: 0 .9rem; border-radius: 999px;
+  border: 1px solid var(--accent); background: var(--accent-soft); color: var(--text); font: 700 .9rem/1 var(--font); cursor: pointer;
+}
+.chip-clear span { color: var(--accent); font-size: .85rem; }
+.notice.empty p { margin-bottom: .75rem; }
+kbd {
+  display: inline-grid; place-items: center; min-width: 1.9rem; height: 1.9rem; padding: 0 .45rem; border-radius: 8px;
+  border: 1px solid var(--line); border-bottom-width: 2px; background: var(--surface); font: 700 .9rem/1 ui-monospace, Menlo, Consolas, monospace;
+}
+.keys { display: grid; grid-template-columns: auto 1fr; gap: .55rem 1rem; align-items: center; margin: .5rem 0 1rem; }
+.keys dd { margin: 0; }

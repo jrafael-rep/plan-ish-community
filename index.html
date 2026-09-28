@@ -29,8 +29,9 @@
 <link rel="stylesheet" href="assets/mobile.css">
 <script type="module" src="assets/feed.js"></script>
 </head>
-<body>
-<main class="wrap feed-wrap">
+<body class="page-explore">
+<div class="explore">
+<main class="explore-feed">
 <div class="feed-top">
   <h1>Explorar</h1>
   <p class="muted">Viagens de quem viajou com o Plan-ish. Abre uma para ver o dia a dia, ou leva-a para o teu planeamento.</p>
@@ -47,10 +48,12 @@
     <button class="tab" type="button" data-level="done" aria-pressed="false">Feitas</button>
     <button class="tab" type="button" data-level="plan" aria-pressed="false">Roteiros</button>
   </div>
+  <div id="active-filters" class="active-filters"></div>
 </div>
 <div id="status"></div>
 <p id="said" class="sr-only" aria-live="polite"></p>
 <div id="feed" class="feed"></div>
 </main>
+</div>
 </body>
 </html>

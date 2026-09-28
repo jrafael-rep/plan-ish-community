@@ -10,13 +10,15 @@ let viaServer = true;
 
 /**
  * Uma página do feed.
- * @param {{ view: string, level: string, words: string, from: number, userId?: string | null }} q
+ * @param {{ view: string, level: string, words: string, days?: string, month?: number | null, from: number, userId?: string | null }} q
  */
-export async function feedPage({ view, level, words, from, userId = null }) {
+export async function feedPage({ view, level, words, days = '', month = null, from, userId = null }) {
   // O servidor ordena cada separador e tira o escondido e quem bloqueei; as
   // colunas e o autor pedem-se como numa leitura da tabela.
   const server = () => sb.rpc('feed_page', {
     p_tab: view, p_level: level || null, p_search: words || null, p_offset: from, p_limit: PAGE,
+    // Só quando há filtro: sem o esquema 12, o pedido de sempre continua a servir.
+    ...(days ? { p_days: days } : {}), ...(month ? { p_month: month } : {}),
   }).select(CARD_COLUMNS);
   // Antes do esquema 11. O id desempata: uma página nunca repete nem salta viagens publicadas no mesmo instante.
   const table = (columns, basic) => {
@@ -46,6 +48,15 @@ function missingFunction(error) {
   return error?.code === 'PGRST202' || error?.code === '42883';
 }
 
+/**
+ * As contagens do painel de filtros (esquema 12). Sem ele, null: o painel
+ * mostra os filtros sem números.
+ */
+export async function feedFacets(words) {
+  const { data, error } = await sb.rpc('explore_facets', { p_search: words || null });
+  return error ? null : data;
+}
+
 /** Letras, números, espaços, hífenes e apóstrofos: vírgulas e parênteses mudariam o filtro. */
 export function searchTerm(text) {
   return text.replace(/[^\p{L}\p{N} '-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
@@ -61,6 +72,11 @@ const invert = (map) => Object.fromEntries(Object.entries(map).map(([k, v]) => [
 const VIEW_OF = invert(VIEWS);
 const LEVEL_OF = invert(LEVELS);
 
+/** As durações do filtro de dias, como o servidor as conhece. */
+export const DAY_SPANS = ['1', '2-3', '4-7', '8+'];
+export const DAY_LABEL = { 1: '1 dia', '2-3': '2 a 3 dias', '4-7': '4 a 7 dias', '8+': '8 dias ou mais' };
+export const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
 /** O que o URL pede. Valores desconhecidos voltam ao defeito. */
 export function readFeedUrl(search = location.search) {
   const p = new URLSearchParams(search);
@@ -68,15 +84,19 @@ export function readFeedUrl(search = location.search) {
     view: VIEW_OF[p.get('vista') ?? ''] ?? 'popular',
     level: LEVEL_OF[p.get('tipo') ?? ''] ?? '',
     words: searchTerm(p.get('q') ?? ''),
+    days: DAY_SPANS.includes(p.get('dias') ?? '') ? p.get('dias') : '',
+    month: /^(?:[1-9]|1[0-2])$/.test(p.get('mes') ?? '') ? Number(p.get('mes')) : null,
   };
 }
 
 /** O URL para este estado, a partir do atual (mantém o resto, como ?ref=). */
-export function feedUrl({ view, level, words }, href = location.href) {
+export function feedUrl({ view, level, words, days = '', month = null }, href = location.href) {
   const url = new URL(href);
   const set = (key, value) => { if (value) url.searchParams.set(key, value); else url.searchParams.delete(key); };
   set('vista', VIEWS[view] ?? '');
   set('tipo', LEVELS[level] ?? '');
   set('q', words);
+  set('dias', days);
+  set('mes', month ? String(month) : '');
   return url.pathname + url.search + url.hash;
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa os esquemas (001 a 011) num Postgres 16 local que imita o Supabase.
+# Testa os esquemas (001 a 012) num Postgres 16 local que imita o Supabase.
 # Uso: sudo bash supabase/test/run.sh   (precisa do utilizador postgres)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 # Os termos (esquema 7) só se exigem nos testes do fim; até lá, como antes.
@@ -344,6 +344,24 @@ q authenticated $F "insert into public.user_blocks(blocker_id, blocked_id) value
 expect "feed: quem bloqueei não aparece" '^0\|2$' "$(q authenticated $F "select count(*) from public.feed_page('recent')")|$(q anon '' "select count(*) from public.feed_page('recent')")"
 q authenticated $F "delete from public.user_blocks where blocker_id = '$F'" >/dev/null
 expect "feed: separador inventado recusado" 'tab_invalid' "$(q anon '' "select id from public.feed_page('tudo')")"
+
+# ------------------------------------------------ esquema 12: explorar com filtros
+adm "update public.itineraries set day_count = 3, travelled_month = '2026-09' where id = '$EIID'; update public.itineraries set day_count = 1, travelled_month = '2025-07', destination = 'gerês' where id = '$E2ID'" >/dev/null
+expect "feed: a app continua a chamar com os cinco de antes" "^$E2ID $EIID\$" "$(q anon '' "select id from public.feed_page(p_tab => 'recent', p_level => null, p_search => null, p_offset => 0, p_limit => 20)")"
+expect "feed: filtro de dias 2-3" "^$EIID\$" "$(q anon '' "select id from public.feed_page('recent', p_days => '2-3')")"
+expect "feed: filtro de dias 1" "^$E2ID\$" "$(q anon '' "select id from public.feed_page('recent', p_days => '1')")"
+expect "feed: filtro de dias 8+ vazio" '^$' "$(q anon '' "select id from public.feed_page('recent', p_days => '8+')")"
+expect "feed: filtro do mês" "^$E2ID\$" "$(q anon '' "select id from public.feed_page('recent', p_month => 7)")"
+expect "feed: dias inventados recusados" 'days_invalid' "$(q anon '' "select id from public.feed_page('recent', p_days => '3-9')")"
+expect "feed: mês 13 recusado" 'month_invalid' "$(q anon '' "select id from public.feed_page('recent', p_month => 13)")"
+expect "filtros: contagens por prova e ao todo" '^2\|1$' "$(q anon '' "select (f->'levels'->>'all')||'|'||(f->'levels'->>'original') from public.explore_facets() f")"
+expect "filtros: contagens por dias" '^1\|1\|0$' "$(q anon '' "select (f->'days'->>'1')||'|'||(f->'days'->>'2-3')||'|'||(f->'days'->>'8+') from public.explore_facets() f")"
+expect "filtros: meses com viagens" '^1\|1\|$' "$(q anon '' "select (f->'months'->>'7')||'|'||(f->'months'->>'9')||'|'||coalesce(f->'months'->>'1','') from public.explore_facets() f")"
+expect "filtros: destinos juntam maiúsculas" '^1$' "$(q anon '' "select count(*) from jsonb_array_elements((select f->'destinations' from public.explore_facets() f)) d where lower(d->>'name') = 'gerês'")"
+expect "filtros: a procura também conta" '^1$' "$(q anon '' "select f->'levels'->>'all' from public.explore_facets('BEIRA') f")"
+q authenticated $F "insert into public.user_blocks(blocker_id, blocked_id) values ('$F','$E')" >/dev/null
+expect "filtros: quem bloqueei não conta" '^0$' "$(q authenticated $F "select f->'levels'->>'all' from public.explore_facets() f")"
+q authenticated $F "delete from public.user_blocks where blocker_id = '$F'" >/dev/null
 
 # ------------------------------------------------ pontos: máximos, moderação, gastar
 adm "update private.points_rules set every = 1 where reason = 'likes'" >/dev/null
