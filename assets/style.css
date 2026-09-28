@@ -473,3 +473,15 @@ kbd {
 }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: .55rem 1rem; align-items: center; margin: .5rem 0 1rem; }
 .keys dd { margin: 0; }
+
+/* O traçado grande (layout/shared/route-map.js): um traço por dia, na cor do dia. */
+.route-map { width: 100%; height: auto; display: block; border-radius: var(--r-sm); background: var(--surface-2); }
+.route-map .hop { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 2 6; stroke-linecap: round; opacity: .6; }
+.route-map polyline { fill: none; stroke: var(--day); stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: round; }
+.route-map circle { fill: var(--day); stroke: var(--surface); stroke-width: 2.5; cursor: pointer; transition: r .15s var(--ease); }
+.route-map circle.on { r: 10; }
+.route-map .leg { transition: opacity .2s var(--ease); }
+.route-map .leg.dim { opacity: .18; }
+.stop.lit { background: var(--accent-soft); border-radius: 10px; box-shadow: -.6rem 0 0 var(--accent-soft), .6rem 0 0 var(--accent-soft); }
+.itin-side[hidden] { display: none; }
+.day[id] { scroll-margin-top: calc(3.6rem + 1rem); }

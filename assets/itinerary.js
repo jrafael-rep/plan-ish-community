@@ -4,6 +4,7 @@ import {
 } from './app.js';
 import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, RATING_INFO, tripCard } from './card.js';
 import { cardsLoading } from './layout/shared/skeleton.js';
+import { mountItinerarySide } from './layout/pc/itinerary.js';
 
 const session = await header('');
 const me = session?.user.id ?? null;
@@ -397,6 +398,14 @@ if (error || !it) {
   const liked = await likedSet(session, [it.id]);
   $('card').replaceChildren(tripCard(it, { session, liked: liked.has(it.id), open: true, page: true }));
   show($('itinerary'), true);
+  // No PC, o traçado, as fotografias e o QR à esquerda; noutros layouts, nada.
+  let side = null;
+  const arrange = (layout) => {
+    if (layout === 'pc' && !side) side = mountItinerarySide(it, { side: $('itin-side'), list: $('card') });
+    else if (layout !== 'pc' && side) { side.unmount(); side = null; }
+  };
+  arrange(document.documentElement.dataset.layout);
+  addEventListener('planish:layout', (e) => arrange(e.detail));
   if (me && it.author_id === me) ownerBar(it);
   $('report').replaceChildren(icon('flag'), 'Denunciar este itinerário');
   $('report').addEventListener('click', () => void report({ itinerary_id: it.id }, 'este itinerário'));

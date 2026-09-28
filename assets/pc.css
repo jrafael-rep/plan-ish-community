@@ -17,7 +17,9 @@
    Navegação · feed numa coluna de leitura · filtros. O cabeçalho e o rodapé
    usam a mesma largura, para tudo alinhar. */
 :root:is([data-layout="pc"], [data-layout="tablet"]) .page-explore header.top .wrap,
-:root:is([data-layout="pc"], [data-layout="tablet"]) .page-explore footer .wrap { max-width: var(--page-max); padding-inline: var(--gutter); }
+:root:is([data-layout="pc"], [data-layout="tablet"]) .page-explore footer .wrap,
+:root[data-layout="pc"] .page-wide header.top .wrap,
+:root[data-layout="pc"] .page-wide footer .wrap { max-width: var(--page-max); padding-inline: var(--gutter); }
 
 :root:is([data-layout="pc"], [data-layout="tablet"]) .explore.wide {
   display: grid; align-items: start; gap: 2rem;
@@ -86,3 +88,36 @@
 :root[data-layout="pc"] .page-explore header.top nav a[aria-current="page"] { display: none; }
 /* Numa coluna de 640 px, a capa 4:3 ocupava o ecrã: 16:10 deixa ver o título. */
 .explore.wide .media { aspect-ratio: 16 / 10; }
+
+/* ------------------------------------------------ itinerário: dividido
+   À esquerda, fixo: traçado, fotografias e QR. À direita: o cartão com o dia
+   a dia, as avaliações e a conversa. */
+:root[data-layout="pc"] .page-itinerary main.itin { max-width: var(--page-max); padding-inline: var(--gutter); }
+:root[data-layout="pc"] .itin-grid:has(> .itin-side:not([hidden])) {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 40rem); gap: 2rem; align-items: start;
+}
+.itin-side {
+  position: sticky; top: calc(var(--top-h) + 1.25rem); display: grid; gap: 1rem;
+  max-height: calc(100dvh - var(--top-h) - 2.5rem); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+}
+/* A capa do cartão repetia o traçado: no PC, o traçado grande à esquerda chega. */
+:root[data-layout="pc"] .itin-grid:has(> .itin-side:not([hidden])) #card .media { display: none; }
+.side-card { background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 1rem; }
+.map-card { padding: .75rem; }
+.legend { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
+.legend-item {
+  display: inline-flex; align-items: center; gap: .4rem; min-height: 36px; padding: 0 .8rem; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text); font: 700 .88rem/1 var(--font); cursor: pointer;
+}
+.legend-item i { width: 10px; height: 10px; border-radius: 50%; }
+.legend-item:hover { background: var(--surface-2); }
+.legend-item[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.photo-grid { display: grid; gap: 4px; border-radius: var(--r-sm); overflow: hidden; }
+.photo-grid.n2, .photo-grid.n4 { grid-template-columns: 1fr 1fr; }
+.photo-grid.n3 { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; }
+.photo-grid.n3 img:first-child { grid-row: span 2; }
+.photo-grid img { width: 100%; height: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.side-card.phone { display: grid; grid-template-columns: 8.5rem 1fr; gap: 1rem; align-items: center; }
+.side-card.phone h2 { font-size: 1.05rem; margin-bottom: .3rem; }
+.side-card.phone p { margin-bottom: .4rem; }
+.qr { width: 8.5rem; height: 8.5rem; border-radius: 10px; }

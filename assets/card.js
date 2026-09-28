@@ -108,13 +108,14 @@ function media(it, photos = Array.isArray(it.photos) ? it.photos.slice(0, 6) : [
 export function dayList(plan) {
   const days = Array.isArray(plan?.days) ? plan.days : [];
   if (!days.length) return el('p', { class: 'muted' }, 'Este itinerário não tem paragens publicadas.');
-  return el('ol', { class: 'days' }, ...days.map((day, i) => el('li', { class: 'day' },
+  // data-day e data-stop ligam cada linha ao seu ponto no traçado (PC).
+  return el('ol', { class: 'days' }, ...days.map((day, i) => el('li', { class: 'day', 'data-day': i, id: `dia-${i + 1}` },
     el('div', { class: 'day-head' }, el('span', { class: 'day-n' }, `Dia ${i + 1}`), day.title ? el('strong', {}, day.title) : null),
     day.summary ? el('p', { class: 'day-summary' }, day.summary) : null,
-    el('ul', { class: 'stops' }, ...(Array.isArray(day.stops) ? day.stops : []).map((stop) => {
+    el('ul', { class: 'stops' }, ...(Array.isArray(day.stops) ? day.stops : []).map((stop, j) => {
       const visit = VISITS[stop.visit] ? stop.visit : '';
       const hasPlace = Number.isFinite(stop.lat) && Number.isFinite(stop.lon);
-      return el('li', { class: `stop${visit ? ` v-${visit}` : ''}` },
+      return el('li', { class: `stop${visit ? ` v-${visit}` : ''}`, 'data-stop': `${i}-${j}` },
         el('div', { class: 'stop-line' },
           el('span', { class: 'stop-name' }, stop.name ?? ''),
           visit === 'gps' ? el('span', { class: 'gps', title: 'Chegada confirmada pelo GPS' }, icon('shield'), 'GPS') : null),

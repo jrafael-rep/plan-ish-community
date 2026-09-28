@@ -29,10 +29,12 @@
 <link rel="stylesheet" href="assets/mobile.css">
 <script type="module" src="assets/itinerary.js"></script>
 </head>
-<body>
-<main class="wrap feed-wrap">
+<body class="page-itinerary page-wide">
+<main class="wrap feed-wrap itin">
 <p class="back"><a href="./">← Explorar</a></p>
 <div id="status"></div>
+<div class="itin-grid">
+<aside id="itin-side" class="itin-side" hidden></aside>
 <div id="itinerary" class="hidden">
   <div id="owner" class="owner-bar hidden"></div>
   <div id="card"></div>
@@ -71,6 +73,7 @@
     <p id="comment-signin" class="notice hidden"></p>
   </section>
   <p class="report"><button class="btn quiet" id="report" type="button"></button></p>
+</div>
 </div>
 </main>
 </body>
