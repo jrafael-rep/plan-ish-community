@@ -7,8 +7,8 @@ const status = $('status');
 const id = new URLSearchParams(location.search).get('id') ?? '';
 status.replaceChildren(profileSkeleton());
 
-const TILE = 'id, title, destination, day_count, evidence, photos, plan, like_count';
-const BASIC_TILE = 'id, title, destination, day_count, plan, like_count';
+const TILE = 'id, title, destination, day_count, stop_count, evidence, photos, plan, like_count';
+const BASIC_TILE = 'id, title, destination, day_count, stop_count, plan, like_count';
 
 const valid = /^[0-9a-f-]{36}$/i.test(id);
 let { data: person, error } = valid
@@ -96,6 +96,11 @@ function tile(it, doneAs) {
     cover,
     el('span', { class: 'tile-text' },
       el('strong', {}, it.title),
-      el('span', {}, [it.destination, plural(it.day_count, 'dia', 'dias')].filter(Boolean).join(' · '))),
+      el('span', {}, [it.destination, plural(it.day_count, 'dia', 'dias')].filter(Boolean).join(' · ')),
+      // Só com rato (PC): o resto do que o cartão diria.
+      el('span', { class: 'tile-more' }, [
+        Number.isFinite(it.stop_count) ? plural(it.stop_count, 'paragem', 'paragens') : null,
+        Number.isFinite(it.like_count) ? plural(it.like_count, 'gosto', 'gostos') : null,
+      ].filter(Boolean).join(' · '))),
     el('span', { class: 'tile-badge' }, badge(doneAs ?? it.evidence)));
 }

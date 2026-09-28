@@ -275,6 +275,7 @@ a.who:hover { color: var(--accent); }
 .profile-head + .tabs { margin-bottom: .75rem; }
 .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; border-radius: var(--r); overflow: hidden; }
 .tile { position: relative; aspect-ratio: 1; display: block; color: #fff; text-decoration: none; background: var(--surface-2); }
+.tile:hover, .tile:focus-visible { color: #fff; }
 .tile img, .tile .cover { width: 100%; height: 100%; object-fit: cover; }
 .tile::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 45%, rgba(0, 0, 0, .6)); }
 .tile-text { position: absolute; left: .55rem; right: .55rem; bottom: .5rem; z-index: 1; display: grid; line-height: 1.2; }
@@ -485,3 +486,4 @@ kbd {
 .stop.lit { background: var(--accent-soft); border-radius: 10px; box-shadow: -.6rem 0 0 var(--accent-soft), .6rem 0 0 var(--accent-soft); }
 .itin-side[hidden] { display: none; }
 .day[id] { scroll-margin-top: calc(3.6rem + 1rem); }
+.tile-more { display: none; }

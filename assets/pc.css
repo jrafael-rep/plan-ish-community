@@ -121,3 +121,26 @@
 .side-card.phone h2 { font-size: 1.05rem; margin-bottom: .3rem; }
 .side-card.phone p { margin-bottom: .4rem; }
 .qr { width: 8.5rem; height: 8.5rem; border-radius: 10px; }
+
+/* ------------------------------------------------ perfil: cabeçalho largo e grelha */
+:root[data-layout="pc"] .page-profile main.wrap { max-width: var(--page-max); padding-inline: var(--gutter); }
+:root[data-layout="pc"] .page-profile .profile-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2rem; padding: 1.6rem 1.75rem;
+}
+:root[data-layout="pc"] .page-profile .stats {
+  grid-template-columns: repeat(4, minmax(6.5rem, auto)); margin: 0; padding: 0 0 0 2rem; border-top: 0; border-left: 1px solid var(--line); gap: 1.25rem;
+}
+:root[data-layout="pc"] .page-profile .stat b { font-size: 1.7rem; }
+:root[data-layout="pc"] .page-profile .avatar.lg { width: 92px; height: 92px; font-size: 1.8rem; }
+:root[data-layout="pc"] .page-profile .grid {
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1rem; border-radius: 0; overflow: visible;
+}
+:root[data-layout="pc"] .page-profile .tile { border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); transition: transform .2s var(--ease), box-shadow .2s var(--ease); }
+:root[data-layout="pc"] .page-profile .tile-text strong { font-size: 1rem; }
+@media (hover: hover) {
+  :root[data-layout="pc"] .page-profile .tile:hover { transform: translateY(-2px); box-shadow: 0 1px 2px rgba(12, 31, 42, .08), 0 14px 32px -12px rgba(12, 31, 42, .35); }
+  :root[data-layout="pc"] .page-profile .tile:hover .tile-more,
+  :root[data-layout="pc"] .page-profile .tile:focus-visible .tile-more { display: block; }
+}
+:root[data-layout="pc"] .page-profile .grid .empty { border-radius: var(--r); }
+:root[data-layout="pc"] .page-profile .profile-head + .tabs { margin: 1.25rem 0 1rem; }
