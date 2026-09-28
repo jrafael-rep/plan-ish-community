@@ -8,6 +8,30 @@ export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, detectSessionInUrl: true, flowType: 'implicit' },
 });
 
+/* ------------------------------------------------------------ convites */
+
+// Quem chega por um link de convite (?ref=CÓDIGO) fica com o código guardado
+// neste browser até entrar na conta; aí diz-se ao servidor quem convidou.
+const REF_KEY = 'planish.ref';
+try {
+  const ref = new URLSearchParams(location.search).get('ref');
+  if (ref && /^[A-HJKMNP-Z2-9]{8}$/i.test(ref)) localStorage.setItem(REF_KEY, ref.toUpperCase());
+} catch { /* sem armazenamento: o convite perde-se, nada mais */ }
+
+/** O código de convite guardado neste browser, se houver. */
+export function pendingRef() {
+  try { return localStorage.getItem(REF_KEY); } catch { return null; }
+}
+
+async function claimPendingRef() {
+  const ref = pendingRef();
+  if (!ref) return;
+  const { error } = await sb.rpc('claim_ref', { p_code: ref });
+  // Sem rede, ou sem o esquema 10: fica para a próxima página.
+  if (error && !/ref_|not_signed_in/.test(`${error.message ?? ''}`)) return;
+  try { localStorage.removeItem(REF_KEY); } catch { /* fica, e o servidor volta a recusar */ }
+}
+
 /** O elemento com este id. */
 export const $ = (id) => document.getElementById(id);
 
@@ -51,6 +75,8 @@ export function explain(error) {
   if (/review_invalid/.test(text)) return 'As estrelas vão de 1 a 5, e o comentário tem no máximo 2000 caracteres.';
   if (/own_itinerary/.test(text)) return 'Este itinerário é teu: não se avalia o próprio itinerário.';
   if (/not_admin/.test(text)) return 'Só para quem modera a Comunidade.';
+  if (/points_insufficient/.test(text)) return 'Ainda não tens pontos suficientes.';
+  if (/gift_invalid/.test(text)) return 'Este código não existe, já foi usado ou expirou.';
   if (/not_signed_in|JWT/.test(text)) return 'Entra na tua conta primeiro.';
   if (/Failed to fetch|NetworkError/.test(text)) return 'Sem ligação. Tenta outra vez daqui a pouco.';
   if (error?.hint) return error.hint;
@@ -241,6 +267,7 @@ export const WITHDRAW_WARNING = 'O itinerário, as fotografias, os gostos, as av
 /** O cabeçalho igual em todas as páginas. */
 export async function header(current) {
   const session = await currentSession();
+  if (session) void claimPendingRef();
   const link = (href, label, id) => el('a', { href, 'aria-current': current === id ? 'page' : undefined }, label);
   const t = document.createElement('template');
   t.innerHTML = MARK;

@@ -4,22 +4,31 @@ import {
 } from './app.js';
 
 const session = await header('conta');
+
+/** O que cada movimento de pontos quer dizer (my_points devolve só a razão). */
+const POINT_REASONS = {
+  trip_done: 'Alguém fez um itinerário teu, com GPS',
+  review_from_doer: 'Avaliação de quem fez um itinerário teu',
+  comment: 'Comentário',
+  likes: 'Gostos num itinerário teu',
+  invite: 'Alguém que convidaste juntou-se',
+  redeem_month: 'Trocados por 1 mês de membro',
+  gift_code: 'Código de oferta criado',
+};
+
 const status = $('status');
 if (!session) location.replace(signInLink('conta.html'));
 else await load();
 
 async function load() {
   $('email').textContent = `Entraste como ${session.user.email}`;
-  const [{ data: profile }, { data: membership }] = await Promise.all([
-    sb.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle(),
-    sb.from('memberships').select('tier, valid_until').maybeSingle(),
-  ]);
+  const { data: profile } = await sb.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
   $('name').replaceChildren(avatar(profile?.display_name, 'lg'), el('span', {}, profile?.display_name ?? ''));
   $('public-profile').href = `viajante.html?id=${encodeURIComponent(session.user.id)}`;
   await loadNextName();
-  const active = membership && (!membership.valid_until || new Date(membership.valid_until) > new Date());
-  $('membership').textContent = active ? 'Membro da Comunidade.' : 'Conta da Comunidade.';
+  await loadMembership();
   await loadMine();
+  await loadPoints();
   // Fotos de algo retirado antes, que não chegaram a sair do Storage.
   sb.rpc('my_photo_trash').then(({ data }) => removePhotos(data), () => {});
   await loadShared();
@@ -31,6 +40,144 @@ async function load() {
   show($('account'), true);
   if (location.hash === '#planos') $('planos').scrollIntoView();
   if (location.hash === '#meus') $('meus').scrollIntoView();
+  if (location.hash === '#pontos') $('pontos').scrollIntoView();
+}
+
+function dateText(iso) {
+  return new Date(iso).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+async function loadMembership() {
+  const { data: membership } = await sb.from('memberships').select('tier, valid_until').maybeSingle();
+  const active = membership && (!membership.valid_until || new Date(membership.valid_until) > new Date());
+  $('membership').textContent = !active ? 'Conta da Comunidade.'
+    : membership.valid_until ? `Membro da Comunidade até ${dateText(membership.valid_until)}.` : 'Membro da Comunidade.';
+}
+
+/* ------------------------------------------------------------- pontos */
+
+function moveLabel(m) {
+  if (m.reason === 'revoked') return `${POINT_REASONS[m.about] ?? 'Pontos'} (retirado)`;
+  return POINT_REASONS[m.reason] ?? 'Acerto';
+}
+
+async function copyText(text, input, box) {
+  try { await navigator.clipboard.writeText(text); notice(box, 'Copiado.'); } catch { input?.select(); }
+}
+
+/** Saldo, trocar, códigos de oferta, convite e movimentos. Só no site. */
+async function loadPoints() {
+  const box = $('points');
+  const { data, error } = await sb.rpc('my_points');
+  // Sem o esquema 10, a secção não aparece.
+  if (error) { show($('pontos'), false); show(box, false); return; }
+  const p = data?.[0] ?? { balance: 0, month_cost: 500, gift_cost: 500, movements: [] };
+  const act = async (button, run) => {
+    button.disabled = true;
+    const text = await run();
+    await loadPoints();
+    if (text) notice($('points-msg'), text.message, text.kind);
+  };
+
+  const month = el('button', { class: 'btn primary', type: 'button', disabled: p.balance < p.month_cost }, 'Trocar por 1 mês de membro');
+  month.addEventListener('click', () => {
+    if (!confirm(`Trocar ${p.month_cost} pontos por 1 mês de membro da Comunidade?`)) return;
+    void act(month, async () => {
+      const { data: r, error: err } = await sb.rpc('redeem_points_for_month');
+      if (err) return { message: explain(err), kind: 'error' };
+      await loadMembership();
+      const row = r?.[0];
+      return row?.outcome === 'no_end'
+        ? { message: 'Já és membro sem data de fim, por isso não usámos pontos.' }
+        : { message: `Feito. És membro até ${dateText(row.member_until)}.` };
+    });
+  });
+
+  const gift = el('button', { class: 'btn', type: 'button', disabled: p.balance < p.gift_cost }, 'Criar código de oferta');
+  gift.addEventListener('click', () => {
+    if (!confirm(`Usar ${p.gift_cost} pontos num código de oferta? Quem o usar fica com 1 mês de membro. O código vale 90 dias.`)) return;
+    void act(gift, async () => {
+      const { data: code, error: err } = await sb.rpc('create_gift_code');
+      if (err) return { message: explain(err), kind: 'error' };
+      return { message: `Código criado: ${code}. Está na lista abaixo, para o copiares.` };
+    });
+  });
+
+  const lowest = Math.min(p.month_cost, p.gift_cost);
+  const codeInput = el('input', {
+    id: 'gift-code', type: 'text', placeholder: 'PLAN-XXXX-XXXX', autocomplete: 'off', spellcheck: 'false',
+    autocapitalize: 'characters', maxlength: 20, class: 'code',
+  });
+  const redeem = el('form', { class: 'inline-form' }, codeInput, el('button', { class: 'btn', type: 'submit' }, 'Usar código'));
+  redeem.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = codeInput.value.trim();
+    if (!code) { codeInput.focus(); return; }
+    void act(e.submitter ?? redeem.querySelector('button'), async () => {
+      const { data: r, error: err } = await sb.rpc('redeem_gift_code', { p_code: code });
+      if (err) return { message: explain(err), kind: 'error' };
+      await loadMembership();
+      const row = r?.[0];
+      return row?.outcome === 'no_end'
+        ? { message: 'Já és membro sem data de fim. O código continua por usar: podes dá-lo a outra pessoa.' }
+        : { message: `Código aceite. És membro até ${dateText(row.member_until)}.` };
+    });
+  });
+
+  const [invite, codes] = await Promise.all([inviteBlock(), giftCodesBlock()]);
+  const moves = p.movements ?? [];
+  box.replaceChildren(el('div', { class: 'points' },
+    el('p', { class: 'points-balance' }, el('b', {}, String(p.balance)), el('span', {}, p.balance === 1 ? 'ponto' : 'pontos')),
+    el('p', { class: 'muted small' }, 'Ganhas pontos quando alguém faz um itinerário teu com o GPS a confirmar, quando quem o fez o avalia, quando comentas e quando os teus itinerários juntam gostos.'),
+    el('div', { class: 'row' }, month, gift),
+    el('p', { class: 'muted small' }, p.balance < lowest
+      ? `Cada troca usa ${lowest} pontos. Faltam ${lowest - p.balance}.`
+      : `Cada troca usa ${lowest} pontos.`),
+    el('div', { id: 'points-msg', role: 'status' }),
+    el('h3', {}, el('label', { for: 'gift-code' }, 'Tenho um código')),
+    redeem,
+    invite,
+    codes,
+    el('h3', {}, 'Movimentos recentes'),
+    moves.length
+      ? el('ul', { class: 'moves' }, ...moves.map((m) => el('li', {},
+        el('span', {}, moveLabel(m), el('span', { class: 'muted small block' }, relativeDay(m.created_at))),
+        el('span', { class: `delta ${m.delta > 0 ? 'up' : 'down'}` }, m.delta > 0 ? `+${m.delta}` : `−${Math.abs(m.delta)}`))))
+      : el('p', { class: 'muted' }, 'Ainda nenhum.'),
+    el('p', { class: 'muted small' }, 'Os pontos não valem dinheiro. Ver os ', el('a', { href: 'termos.html#pontos' }, 'termos'), '.'),
+  ));
+}
+
+async function inviteBlock() {
+  const { data: code, error } = await sb.rpc('my_ref_code');
+  if (error || !code) return null;
+  const url = new URL(`./?ref=${encodeURIComponent(code)}`, location.href).href;
+  const input = el('input', { id: 'invite-link', type: 'text', readonly: true, value: url });
+  const hint = el('div', { role: 'status' });
+  return el('div', {},
+    el('h3', {}, el('label', { for: 'invite-link' }, 'O teu link de convite')),
+    el('div', { class: 'inline-form' }, input,
+      el('button', { class: 'btn', type: 'button', onclick: () => void copyText(url, input, hint) }, 'Copiar')),
+    el('p', { class: 'muted small' }, 'Quem entrar na Comunidade por este link e depois fizer uma viagem com GPS confirmado, ou se tornar membro, dá-te 100 pontos.'),
+    hint);
+}
+
+async function giftCodesBlock() {
+  const { data, error } = await sb.rpc('my_gift_codes');
+  if (error || !data?.length) return null;
+  const now = new Date();
+  const hint = el('div', { role: 'status' });
+  return el('div', {},
+    el('h3', {}, 'Os teus códigos de oferta'),
+    el('div', {}, ...data.map((g) => {
+      const expired = !g.redeemed && new Date(g.expires_at) <= now;
+      const state = g.redeemed ? 'Já foi usado' : expired ? 'Expirou' : `Por usar, vale até ${dateText(g.expires_at)}`;
+      return el('div', { class: 'gift-row' },
+        el('span', {}, el('span', { class: 'code' }, g.code), el('span', { class: 'muted small block' }, state)),
+        g.redeemed || expired ? null
+          : el('button', { class: 'btn quiet', type: 'button', onclick: () => void copyText(g.code, null, hint) }, 'Copiar'));
+    })),
+    hint);
 }
 
 /** Os meus itinerários: o que têm, se a moderação os escondeu, e retirar. */
