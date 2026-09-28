@@ -31,17 +31,18 @@
 <div class="feed-top">
   <h1>Explorar</h1>
   <p class="muted">Viagens de quem viajou com o Plan-ish. Abre uma para ver o dia a dia, ou leva-a para o teu planeamento.</p>
+  <div class="views" role="group" aria-label="Ver">
+    <button class="view" type="button" data-view="popular" aria-pressed="true">Popular</button>
+    <button class="view" type="button" data-view="recent" aria-pressed="false">Recentes</button>
+    <button class="view" type="button" data-view="mine" aria-pressed="false" hidden>Meus</button>
+  </div>
   <label for="search" class="sr-only">Procurar viagens por destino ou título</label>
   <input id="search" class="search" type="search" placeholder="Procurar destino ou título…" autocomplete="off" enterkeyhint="search">
-  <div class="tabs" role="group" aria-label="Mostrar">
+  <div class="tabs" role="group" aria-label="Filtrar pela prova">
     <button class="tab" type="button" data-level="" aria-pressed="true">Tudo</button>
     <button class="tab" type="button" data-level="original" aria-pressed="false">GPS verificado</button>
     <button class="tab" type="button" data-level="done" aria-pressed="false">Feitas</button>
     <button class="tab" type="button" data-level="plan" aria-pressed="false">Roteiros</button>
-  </div>
-  <div class="sorts" role="group" aria-label="Ordenar">
-    <button class="sort" type="button" data-sort="recent" aria-pressed="true">Mais recentes</button>
-    <button class="sort" type="button" data-sort="liked" aria-pressed="false">Mais gostadas</button>
   </div>
 </div>
 <div id="status"></div>

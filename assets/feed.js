@@ -12,10 +12,14 @@ const EMPTY = {
   plan: 'Ainda não há roteiros publicados.',
 };
 
+const EMPTY_MINE = 'Ainda não tens nada aqui. Os itinerários que publicares e as viagens de que gostares aparecem neste separador.';
+
 const PAGE = 20;
+let view = 'popular';
 let level = '';
-let sort = 'recent';
 let words = '';
+/** Sem o esquema 11 não há feed_page: o feed lê a tabela, como antes. */
+let viaServer = true;
 let shown = [];
 /** Only the newest request fills the feed: tabs switch faster than the network. */
 let request = 0;
@@ -29,10 +33,12 @@ for (const tab of document.querySelectorAll('.tab')) {
     void load(false);
   });
 }
-for (const button of document.querySelectorAll('.sort')) {
+for (const button of document.querySelectorAll('.view')) {
+  // "Meus" só com sessão: os meus e os de que gostei.
+  if (button.dataset.view === 'mine') button.hidden = !session;
   button.addEventListener('click', () => {
-    for (const other of document.querySelectorAll('.sort')) other.setAttribute('aria-pressed', String(other === button));
-    sort = button.dataset.sort ?? 'recent';
+    for (const other of document.querySelectorAll('.view')) other.setAttribute('aria-pressed', String(other === button));
+    view = button.dataset.view ?? 'popular';
     void load(false);
   });
 }
@@ -60,18 +66,32 @@ async function load(append) {
   const mine = ++request;
   const from = append ? shown.length : 0;
   if (append) { more.disabled = true; more.textContent = 'A carregar…'; } else { notice(status, 'A carregar…'); more.hidden = true; }
-  // O id desempata: uma página nunca repete nem salta viagens publicadas no mesmo instante.
-  const ask = (columns, basic) => {
+  // O servidor ordena cada separador e tira o escondido e quem bloqueei; as
+  // colunas e o autor pedem-se como numa leitura da tabela.
+  const server = () => sb.rpc('feed_page', {
+    p_tab: view, p_level: level || null, p_search: words || null, p_offset: from, p_limit: PAGE,
+  }).select(CARD_COLUMNS);
+  // Antes do esquema 11. O id desempata: uma página nunca repete nem salta viagens publicadas no mesmo instante.
+  const table = (columns, basic) => {
     let query = sb.from('itineraries').select(columns);
-    if (sort === 'liked') query = query.order('like_count', { ascending: false });
+    if (view === 'popular') query = query.order('like_count', { ascending: false });
+    if (view === 'mine') query = query.eq('author_id', session?.user.id ?? '');
     query = query.order('created_at', { ascending: false }).order('id', { ascending: false })
       .range(from, from + PAGE - 1);
     if (level && !basic) query = query.eq('evidence', level);
     if (words) query = query.or(`title.ilike.*${words}*,destination.ilike.*${words}*`);
     return query;
   };
-  let { data, error } = await ask(CARD_COLUMNS, false);
-  if (missingColumn(error)) ({ data, error } = await ask(BASIC_COLUMNS, true));
+  let data;
+  let error;
+  if (viaServer) {
+    ({ data, error } = await server());
+    if (missingFunction(error)) viaServer = false;
+  }
+  if (!viaServer) {
+    ({ data, error } = await table(CARD_COLUMNS, false));
+    if (missingColumn(error)) ({ data, error } = await table(BASIC_COLUMNS, true));
+  }
   if (mine !== request) return;
   more.disabled = false; more.textContent = 'Ver mais viagens';
   if (error) {
@@ -80,7 +100,8 @@ async function load(append) {
   }
   if (!append && !data.length) {
     feed.replaceChildren();
-    notice(status, words ? `Nenhuma viagem com "${words}" no título ou no destino.` : EMPTY[level] ?? EMPTY['']);
+    notice(status, words ? `Nenhuma viagem com "${words}" no título ou no destino.`
+      : view === 'mine' && !level ? EMPTY_MINE : EMPTY[level] ?? EMPTY['']);
     return;
   }
   const liked = await likedSet(session, data.map((it) => it.id));
@@ -92,4 +113,8 @@ async function load(append) {
   const cards = fresh.map((it) => tripCard(it, { session, liked: liked.has(it.id) }));
   if (append) feed.append(...cards); else feed.replaceChildren(...cards);
   more.hidden = data.length < PAGE;
+}
+
+function missingFunction(error) {
+  return error?.code === 'PGRST202' || error?.code === '42883';
 }
