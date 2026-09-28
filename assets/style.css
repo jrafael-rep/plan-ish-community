@@ -142,7 +142,7 @@ label { display: block; font-weight: 700; margin: 0 0 .35rem; }
   border: 1px solid var(--line); border-radius: 999px; padding: 0 1rem; min-height: 40px; cursor: pointer;
 }
 .tab:hover { color: var(--text); }
-.tab[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--bg); }
+.tab[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .search { border-radius: 999px; padding-inline: 1.1rem; margin-bottom: .7rem; }
 /* Popular / Recentes / Meus: o que se vê. Os filtros (.tabs) ficam por baixo. */
 .views { display: flex; gap: .2rem; width: fit-content; max-width: 100%; padding: .22rem; margin: .1rem 0 .8rem; background: var(--surface-2); border-radius: 999px; }
@@ -151,7 +151,7 @@ label { display: block; font-weight: 700; margin: 0 0 .35rem; }
   min-height: 40px; padding: 0 1.1rem; border-radius: 999px; cursor: pointer; transition: background-color .15s, color .15s;
 }
 .view:hover { color: var(--text); }
-.view[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.view[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); box-shadow: var(--shadow); }
 .feed { display: grid; gap: 1.1rem; }
 .more-btn { display: flex; margin: 1.25rem auto 0; }
 
