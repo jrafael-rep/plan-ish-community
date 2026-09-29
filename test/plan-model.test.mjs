@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   addDay, addStop, buildModel, clockOf, dayLabel, durationText, moveToDay, moveWithinDay, parseKey,
-  remove, setStart, withClock,
+  inverse, remove, setStart, withClock,
 } from '../assets/plan-model.js';
 
 // Um plano inventado, escrito como a app o escreve.
@@ -146,4 +146,31 @@ test('textos', () => {
   assert.equal(durationText(90), '1h 30');
   assert.equal(durationText(120), '2h');
   assert.equal(dayLabel('2027-05-01'), 'sábado, 1 mai');
+});
+
+test('desfazer volta ao que estava, e apaga o que foi criado', () => {
+  const fields = sample();
+  const apply = (changes) => { for (const c of changes) fields.set(c.key, c.value); };
+  const before = buildModel(fields);
+
+  // Mudar um nome e apagar uma paragem: o inverso repõe os dois.
+  const edit = [{ key: 'stop:a:name', value: 'Pastelaria' }, ...remove('stop', 'b')];
+  const undoEdit = inverse(fields, edit);
+  apply(edit);
+  assert.equal(buildModel(fields).stopCount, before.stopCount - 1);
+  apply(undoEdit);
+  assert.deepEqual(buildModel(fields), before);
+
+  // Uma paragem nova: desfazer apaga-a, não deixa um registo vazio.
+  const { changes } = addStop(buildModel(fields), 'd1', 'Nova');
+  const undoAdd = inverse(fields, changes);
+  assert.equal(undoAdd.length, 1);
+  assert.match(undoAdd[0].key, /^stop:.+:deleted$/);
+  apply(changes);
+  apply(undoAdd);
+  assert.equal(buildModel(fields).stopCount, before.stopCount);
+
+  // Um campo novo numa entidade que já existe volta a null.
+  assert.deepEqual(inverse(fields, [{ key: 'stop:a:description', value: 'x' }]),
+    [{ key: 'stop:a:description', value: null }]);
 });

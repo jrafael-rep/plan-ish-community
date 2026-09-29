@@ -8,7 +8,7 @@ import {
   $, appScheme, avatar, el, explain, header, notice, sb, show, signInLink,
 } from './app.js';
 import {
-  addDay, addStop, buildModel, clockOf, dayLabel, durationText, moveToDay, moveWithinDay, remove,
+  addDay, addStop, buildModel, clockOf, dayLabel, durationText, inverse, moveToDay, moveWithinDay, remove,
   peopleLabel, setField, setStart, setStopPeople,
 } from './plan-model.js';
 
@@ -36,6 +36,15 @@ let pollTimer = null;
 let realtimeOk = false;
 /** O que outra pessoa acabou de mudar, e até quando se destaca. */
 const flashes = new Map();
+
+/**
+ * Desfazer e refazer, só do que esta página escreveu. Cada passo guarda o que
+ * escreveu e o que lá estava; desfazer só repõe um campo se ninguém lhe mexeu
+ * entretanto, para não apagar o trabalho de outra pessoa.
+ */
+const undoStack = [];
+const redoStack = [];
+const UNDO_MAX = 100;
 
 const SCHEMA_MISSING = new Set(['42P01', 'PGRST205', 'PGRST202', '42883']);
 
@@ -131,8 +140,9 @@ function listen() {
   addEventListener('beforeunload', () => { clearTimeout(pollTimer); void flush(); });
 }
 
-async function write(changes) {
+async function write(changes, { history = 'new' } = {}) {
   if (!changes.length) return;
+  if (history !== 'none') remember(changes, history);
   for (const c of changes) {
     fields.set(c.key, c.value);
     inFlight.set(c.key, (inFlight.get(c.key) ?? 0) + 1);
@@ -152,6 +162,64 @@ async function write(changes) {
     return;
   }
   paintLive();
+}
+
+const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+function remember(changes, history) {
+  const back = inverse(fields, changes);
+  const top = undoStack.at(-1);
+  // Escrever no mesmo campo, aos bocados, é um só passo.
+  if (history === 'new' && top && changes.length === 1 && top.done.length === 1
+    && top.done[0].key === changes[0].key && Date.now() - top.at < 5_000) {
+    top.done = changes;
+    top.at = Date.now();
+  } else {
+    undoStack.push({ done: changes, back, at: Date.now() });
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
+  }
+  if (history === 'new') redoStack.length = 0;
+  paintUndo();
+}
+
+/** Tira de um passo o que outra pessoa mudou depois (esse campo fica como está). */
+function stillMine(step) {
+  const wrote = new Map(step.done.map((c) => [c.key, c.value]));
+  return step.back.filter((c) => !wrote.has(c.key) || same(fields.get(c.key), wrote.get(c.key)));
+}
+
+async function undo() {
+  await flush();
+  const step = undoStack.pop();
+  if (!step) return;
+  const changes = stillMine(step);
+  redoStack.push({ done: changes, back: inverse(fields, changes), at: Date.now() });
+  paintUndo();
+  if (changes.length) await write(changes, { history: 'none' });
+  announce(changes.length ? 'Desfeito.' : 'Já tinha sido mudado por outra pessoa.');
+}
+
+async function redo() {
+  await flush();
+  const step = redoStack.pop();
+  if (!step) return;
+  const changes = stillMine(step);
+  if (changes.length) await write(changes, { history: 'redo' });
+  paintUndo();
+  announce('Refeito.');
+}
+
+function paintUndo() {
+  const button = $('undo');
+  if (!button) return;
+  button.disabled = !undoStack.length;
+  const redoButton = $('redo');
+  if (redoButton) redoButton.disabled = !redoStack.length;
+}
+
+function announce(text) {
+  const box = $('undo-said');
+  if (box) box.textContent = text;
 }
 
 /** O que se escreveu num campo de texto sai quando se para de escrever. */
@@ -474,6 +542,9 @@ function wire() {
   title.addEventListener('blur', () => void flush());
 
   $('add-day').addEventListener('click', () => void write(addDay(model).changes));
+  $('undo').addEventListener('click', () => void undo());
+  $('redo').addEventListener('click', () => void redo());
+  paintUndo();
 
   $('invite').addEventListener('click', async () => {
     const button = $('invite');
@@ -509,9 +580,19 @@ function wire() {
 }
 
 // Uma tecla para tudo: Ctrl/Cmd+S guarda já o que estiver por guardar.
+// Ctrl/Cmd+Z desfaz (e Ctrl+Shift+Z ou Ctrl+Y refaz) fora de um campo; dentro
+// de um campo de texto fica o desfazer do próprio campo.
 // No PC, N (fora de um campo) vai para "Nova paragem" do dia escolhido.
 addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); void flush(); return; }
+  const mod = e.ctrlKey || e.metaKey;
+  const key = e.key.toLowerCase();
+  if (mod && key === 's') { e.preventDefault(); void flush(); return; }
+  const typing = e.target.closest?.('input:not([type=checkbox]):not([type=time]), textarea, [contenteditable="true"]');
+  if (mod && !e.altKey && !typing && (key === 'z' || key === 'y')) {
+    e.preventDefault();
+    void ((key === 'y' || e.shiftKey) ? redo() : undo());
+    return;
+  }
   if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && layoutNow() === 'pc'
     && !e.target.closest?.('input, textarea, select, [contenteditable="true"]')) {
     const input = document.querySelector('.ed-center .add-stop input');

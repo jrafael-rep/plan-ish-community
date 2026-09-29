@@ -41,6 +41,11 @@
     <div class="plan-live">
       <div id="presence" class="presence" aria-label="Quem está nesta página"></div>
       <p id="live" class="live small" role="status" aria-live="polite"></p>
+      <span class="undo-tools">
+        <button id="undo" class="btn quiet" type="button" aria-keyshortcuts="Control+Z" title="Desfazer (Ctrl+Z)" disabled>Desfazer</button>
+        <button id="redo" class="btn quiet" type="button" aria-keyshortcuts="Control+Shift+Z" title="Refazer (Ctrl+Shift+Z)" disabled>Refazer</button>
+        <span id="undo-said" class="sr-only" role="status" aria-live="polite"></span>
+      </span>
     </div>
   </div>
   <div id="days" class="plan-days"></div>

@@ -310,6 +310,7 @@ footer a { color: var(--muted); }
 .plan-title { font: 800 clamp(1.4rem, 1.2rem + 1vw, 1.8rem)/1.2 var(--font); border-color: transparent; padding: .3rem .5rem; margin: 0 0 .3rem -.5rem; width: calc(100% + .5rem); background: transparent; }
 .plan-title:hover { border-color: var(--line); }
 .plan-live { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; border-top: 1px solid var(--line); padding-top: .7rem; }
+.undo-tools { display: inline-flex; gap: .25rem; margin-left: auto; }
 .presence { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 .here { display: inline-flex; align-items: center; gap: .35rem; font-weight: 700; font-size: .9rem; padding: .2rem .65rem .2rem .2rem; border-radius: 999px; background: var(--surface-2); }
 .here .avatar { width: 26px; height: 26px; font-size: .62rem; }

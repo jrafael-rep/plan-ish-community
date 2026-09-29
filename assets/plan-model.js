@@ -68,6 +68,35 @@ export const setField = (entity, slot, field, value) => [{ key: `${entity}:${slo
 
 export const remove = (entity, slot) => [{ key: `${entity}:${slot}:deleted`, value: true }];
 
+/**
+ * As alterações que desfazem `changes`, lidas do plano de antes (`fields`).
+ * Um campo que não existia volta a `null`; uma entidade que estas alterações
+ * criaram (nenhum campo dela existia) é apagada, em vez de ficar vazia.
+ */
+export function inverse(fields, changes) {
+  const existed = new Set();
+  for (const [key, value] of fields) {
+    const k = parseKey(key);
+    if (k && value !== null && value !== undefined) existed.add(`${k.entity}:${k.slot}`);
+  }
+  const out = [];
+  const created = new Set();
+  const seen = new Set();
+  for (const { key } of changes) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const k = parseKey(key);
+    if (!k) continue;
+    const owner = `${k.entity}:${k.slot}`;
+    if (!existed.has(owner)) {
+      if (!created.has(owner)) { created.add(owner); out.push({ key: `${owner}:deleted`, value: true }); }
+      continue;
+    }
+    out.push({ key, value: fields.has(key) ? fields.get(key) : null });
+  }
+  return out;
+}
+
 /** Os números de ordem para as paragens de um dia ficarem por esta sequência. */
 export function renumber(stops) {
   return stops.flatMap((s, i) => (s.order === i + 1 ? [] : setField('stop', s.slot, 'order', i + 1)));
