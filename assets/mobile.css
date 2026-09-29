@@ -99,3 +99,9 @@ dialog.sheet .opt, dialog.sheet .place { min-height: 46px; font-size: 1rem; }
 [data-layout="mobile"] .m-group.on > h2:first-of-type { margin-top: .3rem; font-size: 1.5rem; }
 /* O sino fica no topo, ao lado do tema. */
 [data-layout="mobile"] .m-shell header.top nav a.bell { display: inline-flex; }
+
+/* ------------------------------------------------ editor partilhado: um dia de cada vez */
+.ed-chips { margin-bottom: .8rem; }
+[data-layout="mobile"] .ed-chips { display: flex; gap: .4rem; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+[data-layout="mobile"] .ed-chips .tab { scroll-snap-align: start; min-height: 44px; }
+.ed-note { margin-top: .8rem; }

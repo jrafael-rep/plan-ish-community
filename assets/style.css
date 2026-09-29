@@ -323,7 +323,7 @@ footer a { color: var(--muted); }
 .day-top .btn { margin-left: auto; }
 .day-title { font-weight: 750; margin: .3rem 0 .6rem; }
 .edit-stops { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; counter-reset: stop; }
-.edit-stop { display: grid; grid-template-columns: 1fr auto; gap: .5rem; padding: .7rem; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg); }
+.edit-stop { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-width: 0; gap: .5rem; padding: .7rem; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--bg); }
 .stop-main { min-width: 0; display: grid; gap: .4rem; }
 .stop-name-input { font-weight: 700; }
 .stop-fields { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
@@ -342,7 +342,7 @@ details textarea { margin-top: .35rem; }
 .flash { animation: flash 1.6s var(--ease); }
 @keyframes flash { 0%, 30% { box-shadow: 0 0 0 3px var(--accent); background-color: var(--accent-soft); } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (max-width: 520px) {
-  .edit-stop { grid-template-columns: 1fr; }
+  .edit-stop { grid-template-columns: minmax(0, 1fr); }
   .stop-tools { flex-direction: row; align-items: center; }
   .stop-tools select { max-width: none; flex: 1 1 0; min-width: 0; }
 }
@@ -547,3 +547,4 @@ a.note-link:hover { background: var(--surface-2); color: var(--text); }
 .note .when { color: var(--muted); font-size: .85rem; flex: none; }
 .note.unread { background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); }
 .note.unread .note-text strong::after { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: .35rem; vertical-align: middle; }
+.plan-days > * { min-width: 0; }

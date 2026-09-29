@@ -193,9 +193,11 @@ function render() {
   $('dates').textContent = [model.trip.destination, range, `${model.stopCount} ${model.stopCount === 1 ? 'paragem' : 'paragens'}`]
     .filter(Boolean).join(' · ');
 
-  $('days').replaceChildren(...(model.days.length
-    ? model.days.map((day, i) => dayCard(day, i, openNotes))
-    : [el('p', { class: 'muted' }, 'Este plano ainda não tem dias.')]));
+  $('days').replaceChildren(...(!model.days.length
+    ? [el('p', { class: 'muted' }, 'Este plano ainda não tem dias.')]
+    : layoutNow() === 'pc' ? [editor3(openNotes)]
+      : layoutNow() === 'mobile' ? mobileDays(openNotes)
+        : model.days.map((day, i) => dayCard(day, i, openNotes))));
   $('ideas').replaceChildren(...(model.ideas.length
     ? model.ideas.map((idea) => el('li', {}, idea.name ?? 'Ideia'))
     : [el('li', { class: 'muted' }, 'Sem ideias guardadas.')]));
@@ -225,6 +227,97 @@ function render() {
     node.style.animationDelay = `${-(1600 - (until - now))}ms`;
   }
   paintLive();
+}
+
+function layoutNow() {
+  return document.documentElement.dataset.layout;
+}
+
+/* O dia e a paragem escolhidos (PC: painéis do meio e da direita; telemóvel: o separador). */
+let chosenDay = null;
+let chosenStop = null;
+function pickDay() {
+  const day = model.days.find((d) => d.slot === chosenDay) ?? model.days[0];
+  chosenDay = day.slot;
+  return day;
+}
+
+/**
+ * O editor no PC, em três painéis: os dias à esquerda, as paragens do dia ao
+ * centro (por ordem, com hora e duração) e a paragem escolhida à direita, com
+ * todos os campos. As chaves dos campos são as de sempre, por isso o cursor e
+ * o que se está a escrever sobrevivem às alterações que chegam dos outros.
+ */
+function editor3(openNotes) {
+  const day = pickDay();
+  const index = model.days.indexOf(day);
+  const others = model.days.filter((d) => d.id !== day.id);
+  const stop = day.stops.find((x) => x.slot === chosenStop) ?? day.stops[0] ?? null;
+  chosenStop = stop?.slot ?? null;
+
+  const nav = el('nav', { class: 'ed-days', 'aria-label': 'Dias' },
+    ...model.days.map((d, i) => el('button', {
+      class: 'ed-day', type: 'button', 'aria-current': d === day ? 'true' : undefined, 'data-day': d.slot,
+      onclick: () => { chosenDay = d.slot; chosenStop = null; scheduleRender(); },
+    }, el('span', { class: 'day-n' }, `Dia ${i + 1}`),
+      el('span', { class: 'ed-day-title' }, d.title || dayLabel(d.date) || 'Sem título'),
+      el('span', { class: 'count' }, String(d.stops.length)))),
+    el('button', { class: 'btn quiet small-btn ed-add-day', type: 'button', onclick: () => void write(addDay(model).changes) }, '+ Acrescentar dia'));
+
+  const rows = el('ol', { class: 'ed-stops' }, ...day.stops.map((s, i) => {
+    const clock = clockOf(s.scheduledTime);
+    return el('li', { class: 'ed-stop', 'data-stop': s.slot, 'aria-current': s === stop ? 'true' : undefined },
+      el('button', {
+        class: 'ed-stop-pick', type: 'button', 'aria-label': `${s.name ?? 'Paragem'}: abrir`,
+        onclick: () => { chosenStop = s.slot; scheduleRender(); },
+      },
+      el('span', { class: 'ed-n' }, String(i + 1)),
+      el('span', { class: 'ed-stop-name', 'data-label': s.slot }, s.name || 'Sem nome'),
+      el('span', { class: 'ed-stop-meta' }, [clock || 'auto', s.durationMin ? durationText(s.durationMin) : null].filter(Boolean).join(' · '))),
+      el('span', { class: 'ed-move' },
+        el('button', { class: 'btn quiet', type: 'button', disabled: i === 0 || undefined, 'aria-label': `Subir ${s.name ?? 'paragem'}`, onclick: () => void write(moveWithinDay(day, s.slot, -1)) }, '↑'),
+        el('button', { class: 'btn quiet', type: 'button', disabled: i === day.stops.length - 1 || undefined, 'aria-label': `Descer ${s.name ?? 'paragem'}`, onclick: () => void write(moveWithinDay(day, s.slot, 1)) }, '↓')));
+  }));
+
+  const center = el('section', { class: 'ed-center day-card', 'data-day': day.slot, 'aria-label': `Dia ${index + 1}` },
+    el('div', { class: 'day-top' },
+      el('span', { class: 'day-n' }, `Dia ${index + 1}`),
+      el('span', { class: 'muted small' }, dayLabel(day.date)),
+      el('button', {
+        class: 'btn quiet danger', type: 'button', 'aria-label': `Apagar o dia ${index + 1}`,
+        onclick: () => {
+          const n = day.stops.length;
+          if (!confirm(`Apagar o dia ${index + 1}${n ? ` e as suas ${n === 1 ? 'paragem' : `${n} paragens`}` : ''}? Desaparece para todos.`)) return;
+          chosenDay = null;
+          void write(remove('day', day.slot));
+        },
+      }, 'Apagar dia')),
+    field(`day:${day.slot}:title`, day.title, { class: 'day-title', 'aria-label': `Título do dia ${index + 1}`, maxlength: 120 }),
+    day.stops.length ? rows : el('p', { class: 'muted small' }, 'Ainda sem paragens neste dia.'),
+    addStopForm(day));
+
+  const detail = el('aside', { class: 'ed-detail', 'aria-label': 'Paragem escolhida' },
+    stop ? el('ol', { class: 'edit-stops' }, stopRow(day, stop, day.stops.indexOf(stop), others, openNotes))
+      : el('p', { class: 'muted' }, 'Escolhe uma paragem ao centro, ou acrescenta uma.'));
+  // O nome muda ao centro enquanto se escreve à direita.
+  const nameInput = detail.querySelector('.stop-name-input');
+  nameInput?.addEventListener('input', () => {
+    const label = rows.querySelector(`[data-label="${CSS.escape(stop.slot)}"]`);
+    if (label) label.textContent = nameInput.value || 'Sem nome';
+  });
+  return el('div', { class: 'editor3' }, nav, center, detail);
+}
+
+/** No telemóvel: os dias como separadores, um dia de cada vez. */
+function mobileDays(openNotes) {
+  const day = pickDay();
+  const tabs = el('div', { class: 'ed-chips', role: 'tablist', 'aria-label': 'Dias' },
+    ...model.days.map((d, i) => el('button', {
+      class: 'tab', type: 'button', role: 'tab', 'aria-selected': String(d === day), 'aria-pressed': String(d === day),
+      onclick: () => { chosenDay = d.slot; scheduleRender(); },
+    }, `Dia ${i + 1}`)));
+  return [tabs, dayCard(day, model.days.indexOf(day), openNotes),
+    el('p', { class: 'muted small ed-note' }, 'No telemóvel dá para ler e fazer mudanças pequenas. No computador, o editor mostra os dias, as paragens e o detalhe lado a lado.')];
 }
 
 /** Um campo de texto ligado a uma chave. */
@@ -416,9 +509,17 @@ function wire() {
 }
 
 // Uma tecla para tudo: Ctrl/Cmd+S guarda já o que estiver por guardar.
+// No PC, N (fora de um campo) vai para "Nova paragem" do dia escolhido.
 addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); void flush(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); void flush(); return; }
+  if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && layoutNow() === 'pc'
+    && !e.target.closest?.('input, textarea, select, [contenteditable="true"]')) {
+    const input = document.querySelector('.ed-center .add-stop input');
+    if (input) { e.preventDefault(); input.focus(); }
+  }
 });
+// Cruzar um limite de layout desenha o editor na forma certa.
+addEventListener('planish:layout', () => scheduleRender());
 
 // No fim: o módulo corre de cima para baixo, e o arranque usa tudo o que está acima.
 if (session) await start();
