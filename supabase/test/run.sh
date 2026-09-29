@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa os esquemas (001 a 013) num Postgres 16 local que imita o Supabase.
+# Testa os esquemas (001 a 014) num Postgres 16 local que imita o Supabase.
 # Uso: sudo bash supabase/test/run.sh   (precisa do utilizador postgres)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql -f $S/014_notifications.sql -f $S/014_notifications.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 # Os termos (esquema 7) só se exigem nos testes do fim; até lá, como antes.
@@ -386,6 +386,30 @@ expect "tirar dos guardados desconta" '^0$' "$(adm "select save_count from publi
 expect "app: guardar pela ligação" '^1$' "$(q anon '' "select public.app_set_save('$ETOK', '$E2ID', true)")"
 expect "app: o que guardei" "^$E2ID\$" "$(q anon '' "select public.app_saved('$ETOK', array['$E2ID','$EIID']::uuid[])")"
 expect "app: não se segue a si próprio" 'follow_self' "$(q anon '' "select public.app_set_follow('$ETOK', '$E', true)")"
+
+# ------------------------------------------------ esquema 14: notificações
+N0=$(adm "select count(*) from public.notifications where user_id = '$E'")
+q authenticated $H "insert into public.likes(itinerary_id, user_id) values ('$E2ID','$H')" >/dev/null
+expect "notificação: gosto chega ao autor" "^$((N0 + 1))\$" "$(adm "select count(*) from public.notifications where user_id = '$E'")"
+q authenticated $H "delete from public.likes where itinerary_id = '$E2ID' and user_id = '$H'" >/dev/null
+q authenticated $H "insert into public.likes(itinerary_id, user_id) values ('$E2ID','$H')" >/dev/null
+expect "notificação: tirar e voltar a gostar não repete" "^$((N0 + 1))\$" "$(adm "select count(*) from public.notifications where user_id = '$E'")"
+q authenticated $H "insert into public.follows(follower_id, followee_id) values ('$H','$E')" >/dev/null
+expect "notificação: novo seguidor" '^1$' "$(adm "select count(*) from public.notifications where user_id = '$E' and kind = 'follow' and actor_id = '$H'")"
+q anon '' "select public.app_set_like('$ETOK', '$E2ID', true)" >/dev/null
+expect "notificação: nada do que se faz a si próprio" '^0$' "$(adm "select count(*) from public.notifications where user_id = '$E' and actor_id = '$E'")"
+expect "notificação: só o destinatário lê" '^0$' "$(q authenticated $H "select count(*) from public.notifications")"
+expect "notificação: anon não lê" 'permission denied' "$(q anon '' "select count(*) from public.notifications")"
+expect "notificação: ninguém escreve" 'permission denied' "$(q authenticated $E "insert into public.notifications(user_id, kind, actor_id) values ('$E','follow','$H')")"
+expect "notificação: por ler" "^$((N0 + 2))\$" "$(q authenticated $E "select public.my_unread_count()")"
+expect "notificação: marcar como lidas" "^$((N0 + 2))\$" "$(q authenticated $E "select public.mark_notifications_read()")"
+expect "notificação: nada por ler" '^0$' "$(q authenticated $E "select public.my_unread_count()")"
+q authenticated $E "insert into public.user_blocks(blocker_id, blocked_id) values ('$E','$H')" >/dev/null
+q authenticated $H "delete from public.follows where follower_id = '$H'" >/dev/null
+q authenticated $H "insert into public.follows(follower_id, followee_id) values ('$H','$E')" >/dev/null
+expect "notificação: de quem bloqueei não chega" '^0$' "$(q authenticated $E "select public.my_unread_count()")"
+q authenticated $E "delete from public.user_blocks where blocker_id = '$E'" >/dev/null
+q authenticated $H "delete from public.follows where follower_id = '$H'; delete from public.likes where user_id = '$H'" >/dev/null
 
 # ------------------------------------------------ pontos: máximos, moderação, gastar
 adm "update private.points_rules set every = 1 where reason = 'likes'" >/dev/null

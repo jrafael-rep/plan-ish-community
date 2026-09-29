@@ -97,3 +97,5 @@ dialog.sheet .opt, dialog.sheet .place { min-height: 46px; font-size: 1rem; }
   border: 0; background: none; color: var(--muted); font: 700 1rem/1 var(--font); cursor: pointer;
 }
 [data-layout="mobile"] .m-group.on > h2:first-of-type { margin-top: .3rem; font-size: 1.5rem; }
+/* O sino fica no topo, ao lado do tema. */
+[data-layout="mobile"] .m-shell header.top nav a.bell { display: inline-flex; }

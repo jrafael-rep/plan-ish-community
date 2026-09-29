@@ -529,3 +529,21 @@ dialog.sheet::backdrop { background: rgba(6, 16, 26, .5); }
 .follow-line { color: var(--muted); margin-top: .25rem !important; font-variant-numeric: tabular-nums; }
 .follow-row { margin-top: .6rem !important; }
 .btn.follow { min-height: 40px; padding-inline: 1.3rem; }
+
+/* ------------------------------------------------ notificações */
+nav a.bell { position: relative; width: 42px; padding: 0; justify-content: center; }
+.bell svg { width: 22px; height: 22px; }
+.bell-count {
+  position: absolute; top: 3px; right: 1px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px;
+  display: grid; place-items: center; background: var(--like); color: #fff; font: 800 .7rem/1 var(--font); font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.notes { list-style: none; margin: 1rem 0 0; padding: 0; background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+.note + .note { border-top: 1px solid var(--line); }
+.note-link { display: flex; align-items: center; gap: .75rem; padding: .85rem 1rem; color: var(--text); text-decoration: none; }
+a.note-link:hover { background: var(--surface-2); color: var(--text); }
+.note-text { flex: 1; min-width: 0; }
+.note-text em { font-style: normal; font-weight: 700; color: var(--accent); }
+.note .when { color: var(--muted); font-size: .85rem; flex: none; }
+.note.unread { background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); }
+.note.unread .note-text strong::after { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: .35rem; vertical-align: middle; }

@@ -135,6 +135,7 @@ const ICONS = {
   sun: '<circle cx="12" cy="12" r="3.8"/><path d="M12 3v2M12 19v2M5.6 5.6 7 7M17 17l1.4 1.4M3 12h2M19 12h2M5.6 18.4 7 17M17 7l1.4-1.4"/>',
   users: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.6a3.2 3.2 0 0 1 0 6M17.5 14a5.5 5.5 0 0 1 3 5"/>',
   search: '<circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 4.5 4.5"/>',
+  bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15l1.5-2Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   bookmark: '<path d="M6.5 4h11a1 1 0 0 1 1 1v15.5l-6.5-4.2-6.5 4.2V5a1 1 0 0 1 1-1Z"/>',
   sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
 };
@@ -268,6 +269,17 @@ export async function withdrawItinerary(id) {
 
 export const WITHDRAW_WARNING = 'O itinerário, as fotografias, os gostos, as avaliações e os comentários são apagados. A viagem na app fica no telemóvel.';
 
+/** O sino: as notificações, com quantas estão por ler (esquema 14). */
+function bellLink(current) {
+  const a = el('a', { class: 'bell', href: 'notificacoes.html', 'aria-label': 'Notificações', title: 'Notificações', 'aria-current': current ? 'page' : undefined }, icon('bell'));
+  void sb.rpc('my_unread_count').then(({ data, error }) => {
+    if (error || !data) return;
+    a.setAttribute('aria-label', `Notificações, ${data} por ler`);
+    a.append(el('span', { class: 'bell-count', 'aria-hidden': 'true' }, data > 99 ? '99+' : String(data)));
+  });
+  return a;
+}
+
 /** O cabeçalho igual em todas as páginas. */
 export async function header(current, { detail = false } = {}) {
   const session = await currentSession();
@@ -282,6 +294,7 @@ export async function header(current, { detail = false } = {}) {
       el('nav', { 'aria-label': 'Principal' },
         link('./', 'Explorar', 'feed'),
         session ? link('conta.html', 'Conta', 'conta') : link(signInLink(), 'Entrar', 'entrar'),
+        session ? bellLink(current === 'avisos') : null,
         modeButton(),
       ),
     ),
