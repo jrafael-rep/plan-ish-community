@@ -230,7 +230,7 @@ export function tripCard(it, { session = null, liked = false, open = false, page
   }, el('span', {}, open ? 'Fechar' : 'Ver roteiro'), icon('chevron'));
 
   const TitleTag = page ? 'h1' : 'h2';
-  return el('article', { class: 'trip', 'aria-labelledby': `t-${it.id}` },
+  const article = el('article', { class: 'trip', 'aria-labelledby': `t-${it.id}` },
     el('header', { class: 'trip-head' },
       who(it.author?.display_name, it.author_id),
       it.created_at ? el('span', { class: 'when' }, relativeDay(it.created_at)) : null),
@@ -259,6 +259,19 @@ export function tripCard(it, { session = null, liked = false, open = false, page
     hint,
     more,
   );
+  // Dois toques na fotografia dão gosto (nunca o tiram), com o ♥ a saltar.
+  // O botão ♥ continua lá: um gesto nunca é o único caminho.
+  article.addEventListener('dblclick', (e) => {
+    const box = e.target.closest?.('.media');
+    if (!box || e.target.closest('button')) return;
+    const like = article.querySelector('.act.like');
+    if (like && like.getAttribute('aria-pressed') !== 'true') like.click();
+    const burst = el('span', { class: 'heart-burst', 'aria-hidden': 'true' }, icon('heart'));
+    box.append(burst);
+    burst.addEventListener('animationend', () => burst.remove());
+    setTimeout(() => burst.remove(), 900);
+  });
+  return article;
 }
 
 async function share(it, hint) {

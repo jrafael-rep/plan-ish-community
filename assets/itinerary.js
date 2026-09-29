@@ -1,12 +1,12 @@
 import {
-  $, blockedSet, blockUser, el, explain, header, icon, notice, plural, relativeDay, sb, show, signInLink, starRow, starText,
+  $, appScheme, blockedSet, blockUser, el, explain, header, icon, notice, plural, relativeDay, sb, show, signInLink, starRow, starText,
   who, withdrawItinerary, withTerms, WITHDRAW_WARNING,
 } from './app.js';
 import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, RATING_INFO, tripCard } from './card.js';
 import { cardsLoading } from './layout/shared/skeleton.js';
 import { mountItinerarySide } from './layout/pc/itinerary.js';
 
-const session = await header('');
+const session = await header('', { detail: true });
 const me = session?.user.id ?? null;
 // Quem a pessoa bloqueou: o que essas contas escrevem não aparece aqui.
 const blocked = await blockedSet(session);
@@ -398,11 +398,15 @@ if (error || !it) {
   const liked = await likedSet(session, [it.id]);
   $('card').replaceChildren(tripCard(it, { session, liked: liked.has(it.id), open: true, page: true }));
   show($('itinerary'), true);
-  // No PC, o traçado, as fotografias e o QR à esquerda; noutros layouts, nada.
+  // No PC, o traçado, as fotografias e o QR à esquerda. No telemóvel, uma
+  // barra fixa em baixo com ♥, a conversa e "Abrir no Plan-ish".
   let side = null;
+  let bar = null;
   const arrange = (layout) => {
     if (layout === 'pc' && !side) side = mountItinerarySide(it, { side: $('itin-side'), list: $('card') });
     else if (layout !== 'pc' && side) { side.unmount(); side = null; }
+    if (layout === 'mobile' && !bar) bar = mountActionBar(it);
+    else if (layout !== 'mobile' && bar) { bar.unmount(); bar = null; }
   };
   arrange(document.documentElement.dataset.layout);
   addEventListener('planish:layout', (e) => arrange(e.detail));
@@ -414,4 +418,30 @@ if (error || !it) {
   await new Thread(it).load();
   if (location.hash === '#conversa') $('conversa').scrollIntoView();
   if (location.hash === '#avaliacoes') $('avaliacoes').scrollIntoView();
+}
+
+/**
+ * A barra fixa do telemóvel. Os botões ♥ e 💬 do cartão mudam-se para lá (os
+ * mesmos elementos, com o mesmo estado) e voltam ao cartão fora do telemóvel.
+ */
+function mountActionBar(it) {
+  const card = $('card');
+  const actions = card.querySelector('.actions');
+  const like = actions?.querySelector('.act.like');
+  const talk = actions?.querySelector('a.act');
+  const open = el('a', { class: 'btn primary', href: `${appScheme()}://itinerary/${encodeURIComponent(it.id)}` }, 'Abrir no Plan-ish');
+  const node = el('div', { class: 'm-action-bar', role: 'region', 'aria-label': 'Ações do itinerário' });
+  if (like) node.append(like);
+  if (talk) node.append(talk);
+  node.append(open);
+  document.body.append(node);
+  document.body.classList.add('has-action-bar');
+  return {
+    unmount() {
+      if (like) actions.prepend(like);
+      if (talk) like ? like.after(talk) : actions.prepend(talk);
+      node.remove();
+      document.body.classList.remove('has-action-bar');
+    },
+  };
 }

@@ -134,6 +134,8 @@ const ICONS = {
   moon: '<path d="M19.5 14.2A7.8 7.8 0 1 1 9.8 4.5a6.3 6.3 0 0 0 9.7 9.7Z"/>',
   sun: '<circle cx="12" cy="12" r="3.8"/><path d="M12 3v2M12 19v2M5.6 5.6 7 7M17 17l1.4 1.4M3 12h2M19 12h2M5.6 18.4 7 17M17 7l1.4-1.4"/>',
   users: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.6a3.2 3.2 0 0 1 0 6M17.5 14a5.5 5.5 0 0 1 3 5"/>',
+  search: '<circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.5 15.5 4.5 4.5"/>',
+  sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
 };
 
 export function icon(name, label) {
@@ -266,7 +268,7 @@ export async function withdrawItinerary(id) {
 export const WITHDRAW_WARNING = 'O itinerário, as fotografias, os gostos, as avaliações e os comentários são apagados. A viagem na app fica no telemóvel.';
 
 /** O cabeçalho igual em todas as páginas. */
-export async function header(current) {
+export async function header(current, { detail = false } = {}) {
   const session = await currentSession();
   if (session) void claimPendingRef();
   const link = (href, label, id) => el('a', { href, 'aria-current': current === id ? 'page' : undefined }, label);
@@ -291,6 +293,16 @@ export async function header(current) {
     el('a', { href: 'privacidade.html' }, 'Privacidade'), ' · ',
     el('a', { href: 'termos.html' }, 'Termos'),
   )));
+  // No telemóvel, separadores em baixo e topo que se esconde (layout/mobile/shell.js).
+  let shell = null;
+  const arrange = async (layout) => {
+    if (layout === 'mobile' && !shell) {
+      const { mountMobileShell } = await import('./layout/mobile/shell.js');
+      if (document.documentElement.dataset.layout === 'mobile' && !shell) shell = mountMobileShell({ current, session, detail });
+    } else if (layout !== 'mobile' && shell) { shell.unmount(); shell = null; }
+  };
+  void arrange(document.documentElement.dataset.layout);
+  addEventListener('planish:layout', (e) => void arrange(e.detail));
   return session;
 }
 

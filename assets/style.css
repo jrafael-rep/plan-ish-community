@@ -490,3 +490,35 @@ kbd {
 /* Conta: a navegação por secções é só do PC (pc.css). */
 .account-nav { display: none; }
 .account-body h2[id], .account-body .hero[id] { scroll-margin-top: calc(3.6rem + 1rem); }
+
+/* ♥ que salta ao dar gosto com dois toques na fotografia. */
+.heart-burst { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: #fff; }
+.heart-burst svg { width: 96px; height: 96px; fill: var(--like); stroke: #fff; filter: drop-shadow(0 4px 18px rgba(0, 0, 0, .35)); animation: burst .8s var(--ease) forwards; }
+@keyframes burst { 0% { transform: scale(.3); opacity: 0; } 25% { transform: scale(1.1); opacity: 1; } 60% { transform: scale(.95); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+
+/* ------------------------------------------------ folha que sobe de baixo
+   (layout/mobile/sheet.js). */
+dialog.sheet {
+  position: fixed; inset: auto 0 0 0; margin: 0; width: 100%; max-width: 40rem; margin-inline: auto;
+  max-height: 88dvh; padding: 0 0 var(--safe-b); border: 0; border-radius: 22px 22px 0 0;
+  background: var(--surface); color: var(--text); box-shadow: 0 -10px 40px rgba(6, 16, 26, .25);
+  display: flex; flex-direction: column; overscroll-behavior: contain;
+  transform: translateY(var(--drag, 0px)); animation: sheet-up .28s var(--ease);
+}
+dialog.sheet:not([open]) { display: none; }
+dialog.sheet.full { height: 94dvh; max-height: 94dvh; }
+dialog.sheet.dragging { animation: none; transition: none; }
+dialog.sheet:not(.dragging) { transition: transform .2s var(--ease); }
+dialog.sheet::backdrop { background: rgba(6, 16, 26, .5); }
+@keyframes sheet-up { from { transform: translateY(100%); } }
+.sheet-handle { display: grid; place-items: center; height: 22px; cursor: grab; touch-action: none; }
+.sheet-handle i { width: 40px; height: 5px; border-radius: 3px; background: var(--line); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: 0 .6rem .4rem 1.1rem; touch-action: none; }
+.sheet-head h2 { font-size: 1.2rem; }
+.sheet-close { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--surface-2); color: var(--text); font-size: 1rem; cursor: pointer; }
+.sheet-body { overflow-y: auto; overscroll-behavior: contain; padding: .2rem 1.1rem 1.2rem; }
+.sheet-foot { position: sticky; bottom: 0; padding-top: .8rem; background: linear-gradient(transparent, var(--surface) 30%); }
+.sheet-foot .btn { width: 100%; }
+.filter-panel h3, .search-group h3 { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 1rem 0 .4rem; }
+.filter-panel h3:first-child { margin-top: .2rem; }
+.search-form .search { margin: 0; }

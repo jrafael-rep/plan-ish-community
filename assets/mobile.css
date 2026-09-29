@@ -7,3 +7,69 @@
   mask-image: linear-gradient(90deg, #000 calc(100% - 2.5rem), transparent);
   padding-right: 2rem;
 }
+
+/* ------------------------------------------------ moldura: topo e separadores */
+[data-layout="mobile"] header.top { transition: transform .25s var(--ease); }
+[data-layout="mobile"] header.top.tucked { transform: translateY(-100%); }
+/* Os destinos vivem nos separadores de baixo; em cima fica a marca e o tema. */
+[data-layout="mobile"] .m-shell header.top nav a { display: none; }
+[data-layout="mobile"] .has-tabs { padding-bottom: calc(4.2rem + var(--safe-b)); }
+[data-layout="mobile"] .has-tabs footer { padding-bottom: 1.5rem; }
+.m-tabs { display: none; }
+[data-layout="mobile"] .m-tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  padding: .3rem max(.5rem, env(safe-area-inset-right)) calc(.3rem + var(--safe-b)) max(.5rem, env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  border-top: 1px solid var(--line);
+}
+.m-tab {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .15rem; min-height: 54px;
+  border: 0; background: none; border-radius: 14px; color: var(--muted); font: 700 .78rem/1.1 var(--font); text-decoration: none; cursor: pointer;
+}
+.m-tab svg { width: 24px; height: 24px; }
+.m-tab[aria-current="page"] { color: var(--accent); }
+.m-tab[aria-current="page"] svg { stroke-width: 2.2; }
+.m-tab:active { background: var(--surface-2); }
+a.m-tab:hover { color: var(--text); }
+
+/* ------------------------------------------------ explorar */
+/* Procurar e Filtros abrem folhas: o campo e a fila de fichas saem. */
+[data-layout="mobile"] .explore:not(.wide) #search,
+[data-layout="mobile"] .explore:not(.wide) .feed-top .tabs { display: none; }
+[data-layout="mobile"] .feed-top h1 { font-size: 1.75rem; }
+[data-layout="mobile"] .feed-top p { font-size: .95rem; }
+.m-explore-bar { display: flex; gap: .5rem; margin: .1rem 0 .2rem; }
+.search-btn { flex: 1; min-width: 0; justify-content: flex-start; color: var(--muted); font-weight: 600; padding-inline: 1rem; }
+.search-btn .search-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-btn.on { color: var(--text); border-color: var(--accent); }
+.filters-btn { flex: none; padding-inline: .95rem; }
+.filters-btn.on { border-color: var(--accent); background: var(--accent-soft); }
+.filter-count:not(:empty) {
+  display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem; padding: 0 .3rem; border-radius: 999px;
+  background: var(--accent); color: var(--accent-ink); font-size: .78rem; font-variant-numeric: tabular-nums;
+}
+/* Cartões de ponta a ponta: a fotografia usa a largura toda do telemóvel. */
+[data-layout="mobile"] .explore-feed .feed { margin-inline: calc(-1 * var(--safe-l)) calc(-1 * var(--safe-r)); gap: .75rem; }
+[data-layout="mobile"] .explore-feed .feed > .trip,
+[data-layout="mobile"] .explore-feed .feed .loading-shape > .trip { border-radius: 0; box-shadow: none; }
+[data-layout="mobile"] .explore-feed .feed .loading-shape { display: grid; gap: .75rem; }
+/* Na folha, cada opção é um alvo de polegar. */
+dialog.sheet .opt, dialog.sheet .place { min-height: 46px; font-size: 1rem; }
+
+/* ------------------------------------------------ itinerário: barra de ação fixa */
+.m-action-bar { display: none; }
+[data-layout="mobile"] .m-action-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: flex; align-items: center; gap: .25rem;
+  padding: .5rem max(.75rem, env(safe-area-inset-right)) calc(.5rem + var(--safe-b)) max(.5rem, env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  border-top: 1px solid var(--line);
+}
+[data-layout="mobile"] .m-action-bar .btn.primary { margin-left: auto; min-height: 48px; }
+[data-layout="mobile"] .has-action-bar { padding-bottom: calc(4.6rem + var(--safe-b)); }
+/* O itinerário de ponta a ponta; "Abrir no Plan-ish" vive na barra de baixo. */
+[data-layout="mobile"] .page-itinerary #card { margin-inline: calc(-1 * var(--safe-l)) calc(-1 * var(--safe-r)); }
+[data-layout="mobile"] .page-itinerary #card > .trip { border-radius: 0; box-shadow: none; }
+[data-layout="mobile"] .has-action-bar #card .more-actions .btn.primary { display: none; }

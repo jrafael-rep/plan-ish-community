@@ -3,6 +3,7 @@ import { likedSet, tripCard } from './card.js';
 import { DAY_LABEL, feedPage, feedUrl, MONTHS, PAGE, readFeedUrl, searchTerm } from './data/feed.js';
 import { cardsLoading } from './layout/shared/skeleton.js';
 import { mountExplore } from './layout/pc/explore.js';
+import { mountMobileExplore } from './layout/mobile/explore.js';
 import { feedKeys } from './layout/pc/keys.js';
 
 const session = await header('feed');
@@ -42,7 +43,9 @@ const active = $('active-filters');
 function activeChips() {
   const chip = (text, clear) => el('button', { class: 'chip-clear', type: 'button', 'aria-label': `Tirar o filtro ${text}`, onclick: () => go(clear) },
     text, el('span', { 'aria-hidden': 'true' }, '✕'));
+  const LEVEL_NAME = { original: 'GPS verificado', done: 'Feitas', plan: 'Roteiros' };
   active.replaceChildren(...[
+    state.level ? chip(LEVEL_NAME[state.level], { level: '' }) : null,
     state.days ? chip(DAY_LABEL[state.days], { days: '' }) : null,
     state.month ? chip(MONTHS[state.month - 1], { month: null }) : null,
   ].filter(Boolean));
@@ -55,6 +58,7 @@ function paint() {
   if (searchTerm(search.value) !== state.words) search.value = state.words;
   activeChips();
   explore?.paint(state);
+  mobile?.paint(state);
 }
 
 /** Muda o estado, guarda-o no URL e volta a carregar. */
@@ -64,7 +68,7 @@ function go(next, { push = true } = {}) {
   const url = feedUrl(state);
   if (push) history.pushState(null, '', url); else history.replaceState(null, '', url);
   paint();
-  if (state.words !== wordsBefore) explore?.facets(state);
+  if (state.words !== wordsBefore) { explore?.facets(state); mobile?.facets(state); }
   void load(false);
 }
 
@@ -88,9 +92,12 @@ search.addEventListener('input', () => {
 
 addEventListener('popstate', () => {
   const wordsBefore = state.words;
-  Object.assign(state, fromUrl());
+  const next = fromUrl();
+  // Fechar uma folha (telemóvel) também volta atrás no histórico, sem mudar o feed.
+  if (feedUrl(next) === feedUrl(state)) return;
+  Object.assign(state, next);
   paint();
-  if (state.words !== wordsBefore) explore?.facets(state);
+  if (state.words !== wordsBefore) { explore?.facets(state); mobile?.facets(state); }
   void load(false);
 });
 
@@ -99,9 +106,14 @@ addEventListener('popstate', () => {
   não os desenha (nem pede as contagens). Cruzar o limite monta ou desmonta.
 */
 let explore = null;
+let mobile = null;
 let keys = null;
 function arrange(layout) {
   const wide = layout === 'pc' || layout === 'tablet';
+  // Nas folhas do telemóvel, cada escolha substitui a entrada da folha no
+  // histórico: Voltar depois de fechar regressa ao feed de antes, de uma vez.
+  if (layout === 'mobile' && !mobile) mobile = mountMobileExplore({ state, go: (next) => go(next, { push: false }) });
+  else if (layout !== 'mobile' && mobile) { mobile.unmount(); mobile = null; }
   if (wide && !explore) {
     explore = mountExplore({ state, go, session });
     explore.facets(state);
