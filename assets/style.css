@@ -100,7 +100,8 @@ label { display: block; font-weight: 700; margin: 0 0 .35rem; }
 .tab[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .search { border-radius: 999px; padding-inline: 1.1rem; margin-bottom: .7rem; }
 /* Popular / Recentes / Meus: o que se vê. Os filtros (.tabs) ficam por baixo. */
-.views { display: flex; gap: .2rem; width: fit-content; max-width: 100%; padding: .22rem; margin: .1rem 0 .8rem; background: var(--surface-2); border-radius: 999px; }
+.views { display: flex; gap: .2rem; width: fit-content; max-width: 100%; padding: .22rem; margin: .1rem 0 .8rem; background: var(--surface-2); border-radius: 999px; overflow-x: auto; scrollbar-width: none; }
+.views::-webkit-scrollbar { display: none; }
 .view {
   flex: none; border: 0; background: transparent; color: var(--muted); font: 750 .95rem/1 var(--font);
   min-height: 40px; padding: 0 1.1rem; border-radius: 999px; cursor: pointer; transition: background-color .15s, color .15s;
@@ -522,3 +523,9 @@ dialog.sheet::backdrop { background: rgba(6, 16, 26, .5); }
 .filter-panel h3, .search-group h3 { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 1rem 0 .4rem; }
 .filter-panel h3:first-child { margin-top: .2rem; }
 .search-form .search { margin: 0; }
+.act.save[aria-pressed="true"] { color: var(--accent); }
+.act.save[aria-pressed="true"] svg { fill: var(--accent); }
+.act.save .act-label { display: none; }
+.follow-line { color: var(--muted); margin-top: .25rem !important; font-variant-numeric: tabular-nums; }
+.follow-row { margin-top: .6rem !important; }
+.btn.follow { min-height: 40px; padding-inline: 1.3rem; }

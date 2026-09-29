@@ -18,7 +18,7 @@
 .m-tabs { display: none; }
 [data-layout="mobile"] .m-tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-  display: grid; grid-template-columns: repeat(3, 1fr);
+  display: grid; grid-template-columns: repeat(var(--tabs, 3), 1fr);
   padding: .3rem max(.5rem, env(safe-area-inset-right)) calc(.3rem + var(--safe-b)) max(.5rem, env(safe-area-inset-left));
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px);

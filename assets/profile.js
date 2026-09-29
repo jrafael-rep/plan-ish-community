@@ -1,4 +1,4 @@
-import { $, avatar, badge, el, explain, header, notice, plural, photoUrl, sb, who } from './app.js';
+import { $, avatar, badge, el, explain, header, notice, plural, photoUrl, sb, signInLink, who } from './app.js';
 import { missingColumn, routeCover } from './card.js';
 import { profileSkeleton } from './layout/shared/skeleton.js';
 
@@ -12,7 +12,7 @@ const BASIC_TILE = 'id, title, destination, day_count, stop_count, plan, like_co
 
 const valid = /^[0-9a-f-]{36}$/i.test(id);
 let { data: person, error } = valid
-  ? await sb.from('profiles').select('id, display_name, created_at, named_by').eq('id', id).maybeSingle()
+  ? await sb.from('profiles').select('id, display_name, created_at, named_by, follower_count, following_count').eq('id', id).maybeSingle()
   : { data: null, error: null };
 // Antes do esquema 2 não há "quem escolheu o nome".
 if (valid && missingColumn(error)) {
@@ -53,6 +53,10 @@ async function render(p) {
     el('div', {},
       el('h1', {}, p.display_name, session?.user.id === p.id ? el('span', { class: 'you' }, 'és tu') : null),
       el('p', { class: 'muted small' }, `Na Comunidade desde ${since}`),
+      Number.isFinite(p.follower_count) ? el('p', { class: 'follow-line small' },
+        el('span', { id: 'followers' }, plural(p.follower_count, 'seguidor', 'seguidores')), ' · ',
+        el('span', {}, `segue ${p.following_count ?? 0}`)) : null,
+      Number.isFinite(p.follower_count) && session?.user.id !== p.id ? followButton(p) : null,
       namer.data || named.data?.[0]
         ? el('p', { class: 'names small' },
           namer.data ? el('span', {}, 'Nome escolhido por ', who(namer.data.display_name, namer.data.id)) : null,
@@ -103,4 +107,34 @@ function tile(it, doneAs) {
         Number.isFinite(it.like_count) ? plural(it.like_count, 'gosto', 'gostos') : null,
       ].filter(Boolean).join(' · '))),
     el('span', { class: 'tile-badge' }, badge(doneAs ?? it.evidence)));
+}
+
+/** Seguir: o feed "A seguir" passa a mostrar o que esta pessoa publica. */
+function followButton(p) {
+  let on = false;
+  let n = p.follower_count;
+  const button = el('button', { class: 'btn follow', type: 'button' });
+  const paint = () => {
+    button.textContent = on ? 'A seguir' : 'Seguir';
+    button.classList.toggle('primary', !on);
+    button.setAttribute('aria-pressed', String(on));
+    const f = document.getElementById('followers');
+    if (f) f.textContent = plural(n, 'seguidor', 'seguidores');
+  };
+  paint();
+  if (session) {
+    void sb.from('follows').select('followee_id').eq('follower_id', session.user.id).eq('followee_id', p.id).maybeSingle()
+      .then(({ data }) => { on = Boolean(data); paint(); });
+  }
+  button.addEventListener('click', async () => {
+    if (!session) { location.href = signInLink(); return; }
+    button.disabled = true;
+    const { error } = on
+      ? await sb.from('follows').delete().eq('follower_id', session.user.id).eq('followee_id', p.id)
+      : await sb.from('follows').insert({ follower_id: session.user.id, followee_id: p.id });
+    button.disabled = false;
+    if (error && error.code !== '23505') { alert(explain(error)); return; }
+    on = !on; n += on ? 1 : -1; paint();
+  });
+  return el('p', { class: 'row follow-row' }, button);
 }

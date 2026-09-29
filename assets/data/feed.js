@@ -66,7 +66,7 @@ export function searchTerm(text) {
    ?vista=recentes&tipo=gps&q=gerês — voltar atrás, recarregar e partilhar
    mostram o mesmo. Os valores por defeito não aparecem no URL. */
 
-const VIEWS = { popular: '', recent: 'recentes', mine: 'meus' };
+const VIEWS = { popular: '', recent: 'recentes', following: 'a-seguir', saved: 'guardados', mine: 'meus' };
 const LEVELS = { '': '', original: 'gps', done: 'feitas', plan: 'roteiros' };
 const invert = (map) => Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k]));
 const VIEW_OF = invert(VIEWS);

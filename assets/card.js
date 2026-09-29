@@ -195,6 +195,37 @@ export function likeButton(it, session, liked, hint) {
   return button;
 }
 
+/** Guardar: "quero fazer isto". Privado; o total é público. Sem sessão, leva a entrar. */
+export function saveButton(it, session, saved, hint) {
+  let on = saved;
+  const button = el('button', { class: 'act save', type: 'button' });
+  const paint = () => {
+    button.replaceChildren(icon('bookmark'), el('span', { class: 'act-label' }, on ? 'Guardado' : 'Guardar'));
+    button.setAttribute('aria-pressed', String(on));
+    button.setAttribute('aria-label', on ? 'Guardado. Tirar dos guardados' : 'Guardar este itinerário');
+  };
+  paint();
+  button.addEventListener('click', async () => {
+    if (!session) { location.href = signInLink(); return; }
+    button.disabled = true;
+    const { error } = on
+      ? await sb.from('saves').delete().eq('itinerary_id', it.id).eq('user_id', session.user.id)
+      : await sb.from('saves').insert({ itinerary_id: it.id, user_id: session.user.id });
+    button.disabled = false;
+    // Sem o esquema 13, a tabela não existe: o botão não faz nada de errado.
+    if (error && error.code !== '23505') { if (hint) hint.textContent = explain(error); return; }
+    on = !on; paint();
+  });
+  return button;
+}
+
+/** Que itinerários desta lista a pessoa com sessão guardou. */
+export async function savedSet(session, ids) {
+  if (!session || !ids.length) return new Set();
+  const { data, error } = await sb.from('saves').select('itinerary_id').in('itinerary_id', ids);
+  return error ? new Set() : new Set((data ?? []).map((s) => s.itinerary_id));
+}
+
 /** Que itinerários desta lista a pessoa com sessão já gostou. */
 export async function likedSet(session, ids) {
   if (!session || !ids.length) return new Set();
@@ -206,7 +237,7 @@ export async function likedSet(session, ids) {
  * O cartão. `open` mostra já o dia a dia (na página do itinerário); no feed
  * abre e fecha no sítio.
  */
-export function tripCard(it, { session = null, liked = false, open = false, page = false } = {}) {
+export function tripCard(it, { session = null, liked = false, saved = false, open = false, page = false } = {}) {
   const href = `itinerario.html?id=${encodeURIComponent(it.id)}`;
   const hint = el('p', { class: 'hint', role: 'status' });
   const budget = budgetText(it.budget_min, it.budget_max);
@@ -255,6 +286,7 @@ export function tripCard(it, { session = null, liked = false, open = false, page
       el('a', { class: 'act', href: page ? '#avaliacoes' : `${href}#avaliacoes`, 'aria-label': `Avaliações e conversa, ${talkCount(it)}` },
         icon('chat'), el('span', {}, String(talkCount(it)))),
       el('button', { class: 'act', type: 'button', 'aria-label': 'Partilhar', onclick: () => void share(it, hint) }, icon('share')),
+      saveButton(it, session, saved, hint),
       page ? null : toggle),
     hint,
     more,

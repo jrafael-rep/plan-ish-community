@@ -1,5 +1,5 @@
 import { $, el, explain, header, notice } from './app.js';
-import { likedSet, tripCard } from './card.js';
+import { likedSet, savedSet, tripCard } from './card.js';
 import { DAY_LABEL, feedPage, feedUrl, MONTHS, PAGE, readFeedUrl, searchTerm } from './data/feed.js';
 import { cardsLoading } from './layout/shared/skeleton.js';
 import { mountExplore } from './layout/pc/explore.js';
@@ -20,12 +20,16 @@ const EMPTY = {
 };
 
 const EMPTY_MINE = 'Ainda não tens nada aqui. Os itinerários que publicares e as viagens de que gostares aparecem neste separador.';
+const EMPTY_FOLLOWING = 'Ainda não segues ninguém, ou quem segues ainda não publicou. No perfil de um viajante, carrega em "Seguir".';
+const EMPTY_SAVED = 'Ainda não guardaste nenhum itinerário. Carrega no marcador de um cartão para o guardar aqui.';
+/** Separadores que só existem com sessão. */
+const PERSONAL = ['mine', 'following', 'saved'];
 
 /** O estado do feed. Começa no URL: um link partilhado, recarregar ou voltar atrás mostram o mesmo. */
 const state = fromUrl();
 function fromUrl() {
   const s = readFeedUrl();
-  if (s.view === 'mine' && !session) s.view = 'popular';
+  if (PERSONAL.includes(s.view) && !session) s.view = 'popular';
   return s;
 }
 let shown = [];
@@ -74,8 +78,8 @@ function go(next, { push = true } = {}) {
 
 for (const tab of tabs) tab.addEventListener('click', () => go({ level: tab.dataset.level ?? '' }));
 for (const button of views) {
-  // "Meus" só com sessão: os meus e os de que gostei.
-  if (button.dataset.view === 'mine') button.hidden = !session;
+  // "A seguir", "Guardados" e "Meus" só com sessão.
+  if (PERSONAL.includes(button.dataset.view)) button.hidden = !session;
   button.addEventListener('click', () => go({ view: button.dataset.view ?? 'popular' }));
 }
 
@@ -160,18 +164,22 @@ async function load(append) {
         el('button', { class: 'btn', type: 'button', onclick: () => go({ words: '', level: '', days: '', month: null }) },
           'Ver todas as viagens')));
     } else {
-      notice(status, view === 'mine' && !level ? EMPTY_MINE : EMPTY[level] ?? EMPTY['']);
+      notice(status, !level && view === 'mine' ? EMPTY_MINE
+        : !level && view === 'following' ? EMPTY_FOLLOWING
+          : !level && view === 'saved' ? EMPTY_SAVED
+            : EMPTY[level] ?? EMPTY['']);
     }
     said.textContent = 'Nenhuma viagem.';
     return;
   }
-  const liked = await likedSet(session, data.map((it) => it.id));
+  const ids = data.map((it) => it.id);
+  const [liked, saved] = await Promise.all([likedSet(session, ids), savedSet(session, ids)]);
   if (mine !== request) return;
   status.replaceChildren();
   const seen = new Set(append ? shown.map((it) => it.id) : []);
   const fresh = data.filter((it) => !seen.has(it.id));
   shown = append ? [...shown, ...fresh] : fresh;
-  const cards = fresh.map((it) => tripCard(it, { session, liked: liked.has(it.id) }));
+  const cards = fresh.map((it) => tripCard(it, { session, liked: liked.has(it.id), saved: saved.has(it.id) }));
   if (append) feed.append(...cards); else feed.replaceChildren(...cards);
   more.hidden = data.length < PAGE;
   said.textContent = append

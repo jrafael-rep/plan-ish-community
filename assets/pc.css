@@ -160,3 +160,4 @@
 .account-nav a.danger-link { color: var(--danger); margin-top: .5rem; }
 .account-nav a.danger-link:hover { color: var(--danger); }
 :root[data-layout="pc"] .account-body > h2:first-of-type { margin-top: 1.75rem; }
+:root[data-layout="pc"] .act.save .act-label { display: inline; }

@@ -2,7 +2,7 @@ import {
   $, appScheme, blockedSet, blockUser, el, explain, header, icon, notice, plural, relativeDay, sb, show, signInLink, starRow, starText,
   who, withdrawItinerary, withTerms, WITHDRAW_WARNING,
 } from './app.js';
-import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, RATING_INFO, tripCard } from './card.js';
+import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, RATING_INFO, savedSet, tripCard } from './card.js';
 import { cardsLoading } from './layout/shared/skeleton.js';
 import { mountItinerarySide } from './layout/pc/itinerary.js';
 
@@ -395,8 +395,8 @@ if (error || !it) {
 } else {
   status.replaceChildren();
   document.title = `${it.title} · Comunidade Plan-ish`;
-  const liked = await likedSet(session, [it.id]);
-  $('card').replaceChildren(tripCard(it, { session, liked: liked.has(it.id), open: true, page: true }));
+  const [liked, saved] = await Promise.all([likedSet(session, [it.id]), savedSet(session, [it.id])]);
+  $('card').replaceChildren(tripCard(it, { session, liked: liked.has(it.id), saved: saved.has(it.id), open: true, page: true }));
   show($('itinerary'), true);
   // No PC, o traçado, as fotografias e o QR à esquerda. No telemóvel, uma
   // barra fixa em baixo com ♥, a conversa e "Abrir no Plan-ish".

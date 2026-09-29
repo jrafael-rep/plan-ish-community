@@ -21,7 +21,9 @@ export function mountMobileShell({ current, session, detail = false }) {
       onFeed
         ? el('button', { class: 'm-tab', type: 'button', onclick: () => dispatchEvent(new CustomEvent('planish:search')) }, icon('search'), el('span', {}, 'Procurar'))
         : tab('./?procurar=1', 'Procurar', 'search', 'procurar'),
+      session ? tab('./?vista=guardados', 'Guardados', 'bookmark', 'guardados') : null,
       session ? tab('conta.html', 'Conta', 'users', 'conta') : tab(signInLink(), 'Entrar', 'users', 'entrar'));
+    tabs.style.setProperty('--tabs', String(tabs.children.length));
     document.body.append(tabs);
     document.body.classList.add('has-tabs');
   }

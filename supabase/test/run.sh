@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa os esquemas (001 a 012) num Postgres 16 local que imita o Supabase.
+# Testa os esquemas (001 a 013) num Postgres 16 local que imita o Supabase.
 # Uso: sudo bash supabase/test/run.sh   (precisa do utilizador postgres)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 # Os termos (esquema 7) só se exigem nos testes do fim; até lá, como antes.
@@ -362,6 +362,30 @@ expect "filtros: a procura também conta" '^1$' "$(q anon '' "select f->'levels'
 q authenticated $F "insert into public.user_blocks(blocker_id, blocked_id) values ('$F','$E')" >/dev/null
 expect "filtros: quem bloqueei não conta" '^0$' "$(q authenticated $F "select f->'levels'->>'all' from public.explore_facets() f")"
 q authenticated $F "delete from public.user_blocks where blocker_id = '$F'" >/dev/null
+
+# ------------------------------------------------ esquema 13: guardar e seguir
+H=$(newuser h)
+q authenticated $F "insert into public.saves(itinerary_id, user_id) values ('$EIID','$F')" >/dev/null
+expect "guardar: conta no itinerário" '^1$' "$(adm "select save_count from public.itineraries where id = '$EIID'")"
+expect "guardar: ninguém guarda por outro" 'row-level security|violates' "$(q authenticated $F "insert into public.saves(itinerary_id, user_id) values ('$E2ID','$E')")"
+expect "guardar: cada um vê só os seus" '^0$' "$(q authenticated $E "select count(*) from public.saves")"
+expect "guardar: anon não lê" 'permission denied' "$(q anon '' "select count(*) from public.saves")"
+expect "feed: guardados, com sessão" "^$EIID\$" "$(q authenticated $F "select id from public.feed_page('saved')")"
+expect "feed: guardados, sem sessão, vazio" '^$' "$(q anon '' "select id from public.feed_page('saved')")"
+q authenticated $F "insert into public.follows(follower_id, followee_id) values ('$F','$E')" >/dev/null
+expect "seguir: contagens no perfil" '^1\|1$' "$(adm "select (select follower_count from public.profiles where id = '$E')||'|'||(select following_count from public.profiles where id = '$F')")"
+expect "seguir: não se segue a si próprio" 'check|violates' "$(q authenticated $F "insert into public.follows(follower_id, followee_id) values ('$F','$F')")"
+expect "seguir: quem é seguido vê" '^1$' "$(q authenticated $E "select count(*) from public.follows")"
+expect "seguir: terceiros não veem" '^0$' "$(q authenticated $H "select count(*) from public.follows")"
+expect "feed: a seguir mostra quem sigo" "^2\$" "$(q authenticated $F "select count(*) from public.feed_page('following')")"
+expect "feed: a seguir, sem ninguém, vazio" '^0$' "$(q authenticated $H "select count(*) from public.feed_page('following')")"
+q authenticated $F "delete from public.follows where follower_id = '$F'" >/dev/null
+expect "deixar de seguir desconta" '^0$' "$(adm "select follower_count from public.profiles where id = '$E'")"
+q authenticated $F "delete from public.saves where user_id = '$F'" >/dev/null
+expect "tirar dos guardados desconta" '^0$' "$(adm "select save_count from public.itineraries where id = '$EIID'")"
+expect "app: guardar pela ligação" '^1$' "$(q anon '' "select public.app_set_save('$ETOK', '$E2ID', true)")"
+expect "app: o que guardei" "^$E2ID\$" "$(q anon '' "select public.app_saved('$ETOK', array['$E2ID','$EIID']::uuid[])")"
+expect "app: não se segue a si próprio" 'follow_self' "$(q anon '' "select public.app_set_follow('$ETOK', '$E', true)")"
 
 # ------------------------------------------------ pontos: máximos, moderação, gastar
 adm "update private.points_rules set every = 1 where reason = 'likes'" >/dev/null
