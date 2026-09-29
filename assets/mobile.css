@@ -112,3 +112,22 @@ dialog.sheet .opt, dialog.sheet .place { min-height: 46px; font-size: 1rem; }
 [data-layout="mobile"] .stop-meta a { display: inline-flex; align-items: center; min-height: 44px; margin-block: -12px; padding-inline: .2rem; }
 [data-layout="mobile"] .comment .tools .btn,
 [data-layout="mobile"] .review .tools .btn { min-height: 44px; min-width: 44px; }
+
+/* Itinerário: os dias deslizam para o lado, um de cada vez (como na app). */
+.m-day-chips { display: none; }
+[data-layout="mobile"] .m-day-chips {
+  position: relative; display: flex; gap: .4rem; overflow-x: auto; scrollbar-width: none;
+  margin: .6rem calc(-1 * var(--gutter)) .2rem; padding: 0 var(--gutter);
+}
+[data-layout="mobile"] .m-day-chips::-webkit-scrollbar { display: none; }
+[data-layout="mobile"] .m-day-chips .tab { flex: none; min-height: 44px; min-width: 64px; }
+[data-layout="mobile"] .days.pager {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 100%; gap: 0; align-items: start;
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory; scrollbar-width: none;
+  transition: height .2s ease;
+}
+[data-layout="mobile"] .days.pager::-webkit-scrollbar { display: none; }
+[data-layout="mobile"] .days.pager > .day { scroll-snap-align: start; scroll-snap-stop: always; padding-right: 2px; }
+@media (prefers-reduced-motion: reduce) { [data-layout="mobile"] .days.pager { transition: none; } }
+.talk-sheet > .panel { box-shadow: none; padding: 0; margin: 0 0 1.4rem; background: none; }

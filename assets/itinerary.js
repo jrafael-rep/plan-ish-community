@@ -5,6 +5,7 @@ import {
 import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, RATING_INFO, savedSet, tripCard } from './card.js';
 import { cardsLoading } from './layout/shared/skeleton.js';
 import { mountItinerarySide } from './layout/pc/itinerary.js';
+import { mountDayPager, mountTalkSheet } from './layout/mobile/itinerary.js';
 
 const session = await header('', { detail: true });
 const me = session?.user.id ?? null;
@@ -436,8 +437,12 @@ function mountActionBar(it) {
   node.append(open);
   document.body.append(node);
   document.body.classList.add('has-action-bar');
+  const pager = mountDayPager(card);
+  const sheet = mountTalkSheet(talk, [$('avaliacoes'), $('conversa')].filter(Boolean));
   return {
     unmount() {
+      pager.unmount();
+      sheet.unmount();
       if (like) actions.prepend(like);
       if (talk) like ? like.after(talk) : actions.prepend(talk);
       node.remove();
