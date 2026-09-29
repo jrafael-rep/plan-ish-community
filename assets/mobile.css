@@ -105,3 +105,10 @@ dialog.sheet .opt, dialog.sheet .place { min-height: 46px; font-size: 1rem; }
 [data-layout="mobile"] .ed-chips { display: flex; gap: .4rem; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
 [data-layout="mobile"] .ed-chips .tab { scroll-snap-align: start; min-height: 44px; }
 .ed-note { margin-top: .8rem; }
+
+/* ------------------------------------------------ alvos de toque (≥ 44 px) sem mudar o desenho */
+[data-layout="mobile"] .brand,
+[data-layout="mobile"] a.who { min-height: 44px; }
+[data-layout="mobile"] .stop-meta a { display: inline-flex; align-items: center; min-height: 44px; margin-block: -12px; padding-inline: .2rem; }
+[data-layout="mobile"] .comment .tools .btn,
+[data-layout="mobile"] .review .tools .btn { min-height: 44px; min-width: 44px; }
