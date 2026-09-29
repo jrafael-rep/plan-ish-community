@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa os esquemas (001 a 014) num Postgres 16 local que imita o Supabase.
+# Testa os esquemas (001 a 015) num Postgres 16 local que imita o Supabase.
 # Uso: sudo bash supabase/test/run.sh   (precisa do utilizador postgres)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" "$HERE/../015_app_feed.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql -f $S/014_notifications.sql -f $S/014_notifications.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql -f $S/014_notifications.sql -f $S/014_notifications.sql -f $S/015_app_feed.sql -f $S/015_app_feed.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 # Os termos (esquema 7) só se exigem nos testes do fim; até lá, como antes.
@@ -386,6 +386,22 @@ expect "tirar dos guardados desconta" '^0$' "$(adm "select save_count from publi
 expect "app: guardar pela ligação" '^1$' "$(q anon '' "select public.app_set_save('$ETOK', '$E2ID', true)")"
 expect "app: o que guardei" "^$E2ID\$" "$(q anon '' "select public.app_saved('$ETOK', array['$E2ID','$EIID']::uuid[])")"
 expect "app: não se segue a si próprio" 'follow_self' "$(q anon '' "select public.app_set_follow('$ETOK', '$E', true)")"
+
+# ------------------------------------------------ esquema 15: separadores pessoais na app
+expect "app: guardados pela ligação" "^$E2ID\$" "$(q anon '' "select id from public.app_feed_page('$ETOK', 'saved')")"
+X=$(newuser x); XTOK=$(link $X 'X')
+FN=$(adm "select count(*) from public.itineraries where author_id = '$E' and not hidden")
+expect "app: quem sigo tem viagens (senão o teste seguinte não mede nada)" '^[1-9]' "$FN"
+q anon '' "select public.app_set_follow('$XTOK', '$E', true)" >/dev/null
+expect "app: a seguir mostra quem sigo" "^$FN\$" "$(q anon '' "select count(*) from public.app_feed_page('$XTOK', 'following')")"
+expect "app: a seguir, sem seguir ninguém, vazio" '^0$' "$(q anon '' "select count(*) from public.app_feed_page('$ETOK', 'following')")"
+expect "app: sem ligação válida, recusa" 'link_invalid' "$(q anon '' "select count(*) from public.app_feed_page('não-é-um-token', 'saved')")"
+expect "app: separador desconhecido recusado" 'tab_invalid' "$(q anon '' "select count(*) from public.app_feed_page('$ETOK', 'tudo')")"
+expect "app: populares também pela ligação" '^[1-9][0-9]*$' "$(q anon '' "select count(*) from public.app_feed_page('$ETOK', 'popular')")"
+expect "feed do site continua igual" '^[1-9][0-9]*$' "$(q anon '' "select count(*) from public.feed_page('recent')")"
+expect "feed_rows não se chama de fora" 'permission denied' "$(q anon '' "select count(*) from private.feed_rows(null, 'recent', null, null, 0, 20, null, null)")"
+q anon '' "select public.app_set_follow('$XTOK', '$E', false)" >/dev/null
+q anon '' "select public.app_set_save('$ETOK', '$E2ID', false)" >/dev/null
 
 # ------------------------------------------------ esquema 14: notificações
 N0=$(adm "select count(*) from public.notifications where user_id = '$E'")
