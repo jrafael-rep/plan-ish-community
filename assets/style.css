@@ -487,3 +487,6 @@ kbd {
 .itin-side[hidden] { display: none; }
 .day[id] { scroll-margin-top: calc(3.6rem + 1rem); }
 .tile-more { display: none; }
+/* Conta: a navegação por secções é só do PC (pc.css). */
+.account-nav { display: none; }
+.account-body h2[id], .account-body .hero[id] { scroll-margin-top: calc(3.6rem + 1rem); }

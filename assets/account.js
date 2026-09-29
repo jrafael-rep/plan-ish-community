@@ -317,3 +317,17 @@ $('delete').addEventListener('click', async () => {
   await sb.auth.signOut();
   location.href = './';
 });
+
+/* No PC, a secção à vista acende-se na navegação da esquerda. */
+{
+  const links = [...document.querySelectorAll('.account-nav a')];
+  const targets = links.map((a) => document.getElementById(a.hash.slice(1))).filter(Boolean);
+  if (links.length && 'IntersectionObserver' in window) {
+    const seen = new IntersectionObserver((entries) => {
+      const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (!top) return;
+      for (const a of links) a.setAttribute('aria-current', String(a.hash === `#${top.target.id}`));
+    }, { rootMargin: '-15% 0px -70% 0px' });
+    for (const t of targets) seen.observe(t);
+  }
+}

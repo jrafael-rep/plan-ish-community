@@ -144,3 +144,19 @@
 }
 :root[data-layout="pc"] .page-profile .grid .empty { border-radius: var(--r); }
 :root[data-layout="pc"] .page-profile .profile-head + .tabs { margin: 1.25rem 0 1rem; }
+
+/* ------------------------------------------------ conta: secções à esquerda */
+:root[data-layout="pc"] .page-account main.wrap { max-width: var(--page-max); padding-inline: var(--gutter); }
+:root[data-layout="pc"] .account-grid { display: grid; grid-template-columns: 14rem minmax(0, 46rem); gap: 2.5rem; align-items: start; }
+:root[data-layout="pc"] .account-nav { margin-left: -.85rem;
+  display: grid; gap: .1rem; position: sticky; top: calc(var(--top-h) + 1.5rem);
+}
+.account-nav a {
+  display: flex; align-items: center; min-height: 42px; padding: 0 .85rem; border-radius: 12px;
+  color: var(--muted); font-weight: 700; text-decoration: none;
+}
+.account-nav a:hover { background: var(--surface-2); color: var(--text); }
+.account-nav a[aria-current="true"] { background: var(--accent); color: var(--accent-ink); }
+.account-nav a.danger-link { color: var(--danger); margin-top: .5rem; }
+.account-nav a.danger-link:hover { color: var(--danger); }
+:root[data-layout="pc"] .account-body > h2:first-of-type { margin-top: 1.75rem; }
