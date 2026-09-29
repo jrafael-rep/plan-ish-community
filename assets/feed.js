@@ -1,4 +1,4 @@
-import { $, el, explain, header, notice } from './app.js';
+import { $, el, explain, header, notice, countEvent } from './app.js';
 import { likedSet, savedSet, tripCard } from './card.js';
 import { DAY_LABEL, feedPage, feedUrl, MONTHS, PAGE, readFeedUrl, searchTerm } from './data/feed.js';
 import { cardsLoading } from './layout/shared/skeleton.js';
@@ -7,6 +7,7 @@ import { mountMobileExplore } from './layout/mobile/explore.js';
 import { feedKeys } from './layout/pc/keys.js';
 
 const session = await header('feed');
+countEvent('site_open_feed');
 const status = $('status');
 const feed = $('feed');
 // O que mudou, dito a quem usa leitor de ecrã (o feed muda sem recarregar).

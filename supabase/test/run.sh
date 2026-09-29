@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa os esquemas (001 a 015) num Postgres 16 local que imita o Supabase.
+# Testa os esquemas (001 a 016) num Postgres 16 local que imita o Supabase.
 # Uso: sudo bash supabase/test/run.sh   (precisa do utilizador postgres)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" "$HERE/../015_app_feed.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" "$HERE/../015_app_feed.sql" "$HERE/../016_metrics.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql -f $S/014_notifications.sql -f $S/014_notifications.sql -f $S/015_app_feed.sql -f $S/015_app_feed.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql -f $S/014_notifications.sql -f $S/014_notifications.sql -f $S/015_app_feed.sql -f $S/015_app_feed.sql -f $S/016_metrics.sql -f $S/016_metrics.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 # Os termos (esquema 7) só se exigem nos testes do fim; até lá, como antes.
@@ -498,5 +498,24 @@ q authenticated $E "select public.delete_my_account()" >/dev/null
 expect "apagar a conta leva os pontos e os convites" '^0\|0\|0$' "$(adm "select (select count(*) from private.points_ledger where user_id = '$E')||'|'||(select count(*) from private.ref_codes where user_id = '$E')||'|'||(select count(*) from private.referrals where inviter_id = '$E')")"
 expect "quem comentou não perde pontos quando o itinerário sai" "^$FP\$" "$(pts $F)"
 expect "um código por usar sobrevive a quem o criou" '^extended$' "$(q authenticated $F "select outcome from public.redeem_gift_code('PLAN-4444-5555')")"
+
+# ---- 016: métricas (contagens por dia, sem pessoas) ----
+MADM=$(adm "insert into auth.users(email) values ('metricas@example.org') returning id" | head -1)
+adm "insert into private.admins(user_id) values ('$MADM')" >/dev/null
+MIID=$(adm "insert into public.itineraries(author_id, title, day_count, stop_count, plan) values ('$MADM', 'Métricas', 1, 1, '{}') returning id" | head -1)
+q anon "" "select public.count_event('app_open_feed')" >/dev/null
+q anon "" "select public.count_event('app_copy', '$MIID')" >/dev/null
+q anon "" "select public.count_event('app_copy', '$MIID')" >/dev/null
+expect "contar sem sessão, por dia" '^1\|2$' "$(adm "select (select n from private.daily_counts where kind = 'app_open_feed')||'|'||(select n from private.daily_counts where kind = 'app_copy')")"
+expect "e por itinerário, só o total" '^2$' "$(adm "select n from private.itinerary_counts where itinerary_id = '$MIID' and kind = 'app_copy'")"
+expect "um acontecimento inventado é recusado" 'unknown_metric' "$(q anon '' "select public.count_event('pagamento')")"
+q anon "" "select public.count_event('site_view_itinerary', gen_random_uuid())" >/dev/null
+expect "um itinerário inventado não cria linha" '^0$' "$(adm "select count(*) from private.itinerary_counts where kind = 'site_view_itinerary'")"
+expect "as contagens não guardam pessoas" '^day,kind,n\|itinerary_id,kind,n$' "$(adm "select (select string_agg(column_name, ',' order by ordinal_position) from information_schema.columns where table_schema = 'private' and table_name = 'daily_counts')||'|'||(select string_agg(column_name, ',' order by ordinal_position) from information_schema.columns where table_schema = 'private' and table_name = 'itinerary_counts')")"
+expect "as contagens não se leem pela API" 'permission denied' "$(q anon '' 'select * from private.daily_counts')"
+expect "o painel é só para quem modera" 'not_admin|forbidden|admin' "$(q authenticated $C "select public.admin_metrics(30)")"
+expect "anon não vê o painel" 'permission denied' "$(q anon '' "select public.admin_metrics(30)")"
+expect "o painel: totais, séries de 30 dias e cópias" '^true\|30\|2$' "$(q authenticated $MADM "select ((m->'totals'->>'accounts')::int > 0) ||'|'|| jsonb_array_length(m->'series'->'app_copy') ||'|'|| (m->'totals'->>'copies') from public.admin_metrics(30) m")"
+expect "o painel mostra o mais copiado" "^$MIID\$" "$(q authenticated $MADM "select m->'top'->'app_copy'->0->>'id' from public.admin_metrics(7) m")"
 
 echo; [ $FAILS -eq 0 ] && echo "Tudo certo." || { echo "$FAILS falhas."; exit 1; }

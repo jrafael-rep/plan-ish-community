@@ -1,5 +1,5 @@
 import {
-  $, appScheme, blockedSet, blockUser, el, explain, header, icon, notice, plural, relativeDay, sb, show, signInLink, starRow, starText,
+  $, appScheme, blockedSet, blockUser, countEvent, el, explain, header, icon, notice, plural, relativeDay, sb, show, signInLink, starRow, starText,
   who, withdrawItinerary, withTerms, WITHDRAW_WARNING,
 } from './app.js';
 import { BASIC_COLUMNS, CARD_COLUMNS, likedSet, missingColumn, RATING_INFO, savedSet, tripCard } from './card.js';
@@ -396,6 +396,7 @@ if (error || !it) {
 } else {
   status.replaceChildren();
   document.title = `${it.title} · Comunidade Plan-ish`;
+  countEvent('site_view_itinerary', it.id);
   const [liked, saved] = await Promise.all([likedSet(session, [it.id]), savedSet(session, [it.id])]);
   $('card').replaceChildren(tripCard(it, { session, liked: liked.has(it.id), saved: saved.has(it.id), open: true, page: true }));
   show($('itinerary'), true);

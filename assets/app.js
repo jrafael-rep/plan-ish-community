@@ -398,3 +398,12 @@ export function starRow(n, label = `${n} de 5 estrelas`) {
       return s;
     }));
 }
+
+/**
+ * Conta uma visita para o painel: só "mais um hoje" (e, num itinerário, mais
+ * um nesse itinerário). Não leva quem, de onde nem localização, e uma falha
+ * não se nota: é só um número a menos.
+ */
+export function countEvent(kind, itineraryId = null) {
+  void sb.rpc('count_event', { p_kind: kind, p_itinerary_id: itineraryId }).then(() => {}, () => {});
+}
