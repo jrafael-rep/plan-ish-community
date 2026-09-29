@@ -38,9 +38,21 @@ async function load() {
   show($('moderation-link'), admin === true);
   await loadLinks();
   show($('account'), true);
-  if (location.hash === '#planos') $('planos').scrollIntoView();
-  if (location.hash === '#meus') $('meus').scrollIntoView();
-  if (location.hash === '#pontos') $('pontos').scrollIntoView();
+  // No telemóvel, uma lista de secções (layout/mobile/account.js).
+  let mobile = null;
+  const arrange = async (layout) => {
+    if (layout === 'mobile' && !mobile) {
+      const { mountMobileAccount } = await import('./layout/mobile/account.js');
+      mobile = mountMobileAccount();
+    } else if (layout !== 'mobile' && mobile) { mobile.unmount(); mobile = null; }
+  };
+  await arrange(document.documentElement.dataset.layout);
+  addEventListener('planish:layout', (e) => void arrange(e.detail));
+  if (!mobile) {
+    if (location.hash === '#planos') $('planos').scrollIntoView();
+    if (location.hash === '#meus') $('meus').scrollIntoView();
+    if (location.hash === '#pontos') $('pontos').scrollIntoView();
+  }
 }
 
 function dateText(iso) {

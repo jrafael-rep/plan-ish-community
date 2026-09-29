@@ -73,3 +73,27 @@ dialog.sheet .opt, dialog.sheet .place { min-height: 46px; font-size: 1rem; }
 [data-layout="mobile"] .page-itinerary #card { margin-inline: calc(-1 * var(--safe-l)) calc(-1 * var(--safe-r)); }
 [data-layout="mobile"] .page-itinerary #card > .trip { border-radius: 0; box-shadow: none; }
 [data-layout="mobile"] .has-action-bar #card .more-actions .btn.primary { display: none; }
+
+/* ------------------------------------------------ conta: lista de secções */
+.m-sections, .m-back { display: none; }
+[data-layout="mobile"] .m-sections { display: grid; margin: 1rem 0; background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+.m-sections a.m-section-link { border-radius: 0; }
+.m-section-link {
+  display: flex; align-items: center; justify-content: space-between; min-height: 54px; padding: 0 1.1rem;
+  color: var(--text); font-weight: 700; text-decoration: none; border-top: 1px solid var(--line);
+}
+.m-section-link:first-child { border-top: 0; }
+.m-section-link span:last-child { color: var(--muted); font-size: 1.4rem; }
+.m-section-link.danger-link { color: var(--danger); }
+.m-section-link:active { background: var(--surface-2); }
+/* Com uma secção aberta: só ela, com "← Conta" em cima. Sem nenhuma: o perfil e a lista. */
+[data-layout="mobile"] .page-account .m-group:not([data-id="perfil"]) { display: none; }
+[data-layout="mobile"] .page-account:not([data-msection=""]) .m-group[data-id="perfil"],
+[data-layout="mobile"] .page-account:not([data-msection=""]) .m-sections,
+[data-layout="mobile"] .page-account:not([data-msection=""]) main > h1 { display: none; }
+[data-layout="mobile"] .page-account .m-group.on { display: block; }
+[data-layout="mobile"] .m-group.on .m-back {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 .2rem; margin-bottom: .3rem;
+  border: 0; background: none; color: var(--muted); font: 700 1rem/1 var(--font); cursor: pointer;
+}
+[data-layout="mobile"] .m-group.on > h2:first-of-type { margin-top: .3rem; font-size: 1.5rem; }
