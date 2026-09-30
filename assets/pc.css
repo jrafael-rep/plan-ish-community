@@ -147,7 +147,16 @@
 
 /* ------------------------------------------------ conta: secções à esquerda */
 :root[data-layout="pc"] .page-account main.wrap { max-width: var(--page-max); padding-inline: var(--gutter); }
-:root[data-layout="pc"] .account-grid { display: grid; grid-template-columns: 14rem minmax(0, 46rem); gap: 2.5rem; align-items: start; }
+:root[data-layout="pc"] .account-grid { display: block; max-width: 46rem; }
+/* Os separadores substituem a navegação da esquerda (fica no DOM: o telemóvel lê os nomes). */
+:root[data-layout="pc"] .account-grid > .account-nav { display: none; }
+.acc-tabs { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0 1.5rem; padding: .35rem; background: var(--surface); border-radius: 999px; }
+.acc-tab { display: inline-flex; align-items: center; min-height: 40px; padding: 0 1rem; border-radius: 999px;
+  color: var(--muted); font-weight: 700; text-decoration: none; }
+.acc-tab:hover { background: var(--surface-2); color: var(--text); }
+.acc-tab[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.acc-tab.end { margin-left: auto; }
+.acc-panel > h2:first-child { margin-top: 0; }
 :root[data-layout="pc"] .account-nav { margin-left: -.85rem;
   display: grid; gap: .1rem; position: sticky; top: calc(var(--top-h) + 1.5rem);
 }

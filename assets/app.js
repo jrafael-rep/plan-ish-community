@@ -281,8 +281,36 @@ function bellLink(current) {
 }
 
 /** O cabeçalho igual em todas as páginas. */
+/*
+ * Terminar a conta. O dono, 30 set: quem cria conta tem de escolher o nome da
+ * próxima pessoa antes de fazer o que quer que seja. Enquanto houver nomes por
+ * escolher, qualquer página (menos estas) manda para a Conta, e depois volta.
+ */
+const OPEN_PAGES = new Set(['conta.html', 'entrar.html', 'termos.html', 'privacidade.html']);
+
+export async function accountUnfinished(session) {
+  if (!session) return false;
+  const key = `planish:account-done:${session.user.id}`;
+  try { if (sessionStorage.getItem(key)) return false; } catch { /* sem armazenamento: pergunta */ }
+  const { data, error } = await sb.rpc('my_name_choices');
+  if (error) return false; // na dúvida, não prende ninguém
+  const row = data?.[0];
+  const unfinished = Boolean(row && !row.chosen && row.names?.length);
+  if (!unfinished) { try { sessionStorage.setItem(key, '1'); } catch { /* idem */ } }
+  return unfinished;
+}
+
+export function markAccountFinished(session) {
+  try { sessionStorage.setItem(`planish:account-done:${session.user.id}`, '1'); } catch { /* idem */ }
+}
+
 export async function header(current, { detail = false } = {}) {
   const session = await currentSession();
+  const page = location.pathname.split('/').pop() || 'index.html';
+  if (!OPEN_PAGES.has(page) && await accountUnfinished(session)) {
+    location.replace(`conta.html?terminar=1&next=${encodeURIComponent(here())}`);
+    return new Promise(() => {}); // a página não continua: vai para a Conta
+  }
   if (session) void claimPendingRef();
   const link = (href, label, id) => el('a', { href, 'aria-current': current === id ? 'page' : undefined }, label);
   const t = document.createElement('template');

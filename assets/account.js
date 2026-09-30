@@ -1,6 +1,6 @@
 import {
-  $, acceptCurrentTerms, avatar, badge, el, explain, header, monthLabel, notice, plural, relativeDay, removePhotos, sb, show,
-  signInLink, starText, withdrawItinerary, WITHDRAW_WARNING,
+  $, acceptCurrentTerms, accountUnfinished, avatar, badge, el, explain, header, monthLabel, notice, plural, relativeDay, removePhotos, sb, show,
+  markAccountFinished, signInLink, starText, withdrawItinerary, WITHDRAW_WARNING,
 } from './app.js';
 
 const session = await header('conta');
@@ -20,11 +20,48 @@ const status = $('status');
 if (!session) location.replace(signInLink('conta.html'));
 else await load();
 
+/** Para onde voltar depois de terminar a conta: só páginas deste site. */
+function nextPage() {
+  const next = new URLSearchParams(location.search).get('next') ?? '';
+  return /^[a-z0-9-]+\.html(\?[^#]*)?(#.*)?$/i.test(next) && !next.startsWith('conta.html') ? next : null;
+}
+
+/*
+ * Falta escolher o nome do próximo: é o único passo, e mais nada aparece
+ * até estar feito (o dono, 30 set).
+ */
+async function finishFirst(profileName) {
+  $('account').classList.add('hidden');
+  const box = el('div', { class: 'finish-account' });
+  status.after(box);
+  const { data } = await sb.rpc('my_name_choices');
+  const row = data?.[0];
+  box.replaceChildren(
+    el('div', { class: 'hero' },
+      el('p', { class: 'name' }, avatar(profileName, 'lg'), el('span', {}, profileName ?? '')),
+      row?.named_by ? el('p', { class: 'muted small' }, `Nome escolhido por ${row.named_by}.`) : null),
+    el('h2', {}, 'Falta um passo'),
+    el('p', {}, 'Na Comunidade ninguém escolhe o próprio nome: cada pessoa recebe um e escolhe o da próxima que chegar. Escolhe o nome da próxima pessoa para terminar a tua conta.'),
+    el('div', { class: 'choices' }, ...(row?.names ?? []).map((name) => el('button', {
+      class: 'btn chip-btn', type: 'button',
+      onclick: async () => {
+        if (!confirm(`Dar o nome "${name}" à próxima pessoa? Não dá para mudar depois.`)) return;
+        const { error: err } = await sb.rpc('give_next_name', { p_name: name });
+        if (err) { notice(status, explain(err), 'error'); return; }
+        markAccountFinished(session);
+        location.replace(nextPage() ?? 'conta.html');
+      },
+    }, name))),
+    el('p', { class: 'muted small' }, 'Se entraste com o email errado, podes ', el('a', { href: '#', onclick: (e) => { e.preventDefault(); void deleteAccount(); } }, 'apagar esta conta'), '.'),
+  );
+}
+
 async function load() {
   $('email').textContent = `Entraste como ${session.user.email}`;
   const { data: profile } = await sb.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle();
   $('name').replaceChildren(avatar(profile?.display_name, 'lg'), el('span', {}, profile?.display_name ?? ''));
   $('public-profile').href = `viajante.html?id=${encodeURIComponent(session.user.id)}`;
+  if (await accountUnfinished(session)) { await finishFirst(profile?.display_name); return; }
   await loadNextName();
   await loadMembership();
   await loadMine();
@@ -38,21 +75,27 @@ async function load() {
   show($('moderation-link'), admin === true);
   await loadLinks();
   show($('account'), true);
-  // No telemóvel, uma lista de secções (layout/mobile/account.js).
+  // No telemóvel, uma lista de secções (layout/mobile/account.js); no PC,
+  // separadores (layout/pc/account.js).
   let mobile = null;
+  let pc = null;
   const arrange = async (layout) => {
-    if (layout === 'mobile' && !mobile) {
-      const { mountMobileAccount } = await import('./layout/mobile/account.js');
-      mobile = mountMobileAccount();
-    } else if (layout !== 'mobile' && mobile) { mobile.unmount(); mobile = null; }
+    if (layout === 'mobile') {
+      if (pc) { pc.unmount(); pc = null; }
+      if (!mobile) {
+        const { mountMobileAccount } = await import('./layout/mobile/account.js');
+        mobile = mountMobileAccount();
+      }
+    } else {
+      if (mobile) { mobile.unmount(); mobile = null; }
+      if (!pc) {
+        const { mountPcAccount } = await import('./layout/pc/account.js');
+        pc = mountPcAccount();
+      }
+    }
   };
   await arrange(document.documentElement.dataset.layout);
   addEventListener('planish:layout', (e) => void arrange(e.detail));
-  if (!mobile) {
-    if (location.hash === '#planos') $('planos').scrollIntoView();
-    if (location.hash === '#meus') $('meus').scrollIntoView();
-    if (location.hash === '#pontos') $('pontos').scrollIntoView();
-  }
 }
 
 function dateText(iso) {
@@ -319,7 +362,8 @@ async function loadNextName() {
 }
 
 $('signout').addEventListener('click', async () => { await sb.auth.signOut(); location.href = './'; });
-$('delete').addEventListener('click', async () => {
+$('delete').addEventListener('click', () => void deleteAccount());
+async function deleteAccount() {
   if (!confirm('Apagar a conta, os itinerários publicados, as avaliações, os comentários e os gostos? Isto não se desfaz.')) return;
   // Primeiro os itinerários, para as fotos saírem do Storage enquanto há sessão.
   const { data: photos, error: withdrawError } = await sb.rpc('withdraw_all_mine');
@@ -328,18 +372,4 @@ $('delete').addEventListener('click', async () => {
   if (error) { notice(status, explain(error), 'error'); return; }
   await sb.auth.signOut();
   location.href = './';
-});
-
-/* No PC, a secção à vista acende-se na navegação da esquerda. */
-{
-  const links = [...document.querySelectorAll('.account-nav a')];
-  const targets = links.map((a) => document.getElementById(a.hash.slice(1))).filter(Boolean);
-  if (links.length && 'IntersectionObserver' in window) {
-    const seen = new IntersectionObserver((entries) => {
-      const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (!top) return;
-      for (const a of links) a.setAttribute('aria-current', String(a.hash === `#${top.target.id}`));
-    }, { rootMargin: '-15% 0px -70% 0px' });
-    for (const t of targets) seen.observe(t);
-  }
 }
