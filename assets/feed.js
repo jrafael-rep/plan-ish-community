@@ -1,5 +1,5 @@
-import { $, el, explain, header, notice, countEvent } from './app.js';
-import { likedSet, savedSet, tripCard } from './card.js';
+import { $, aiBadge, el, explain, header, notice, countEvent, plural, sb, show } from './app.js';
+import { CARD_COLUMNS, likedSet, routeCover, savedSet, tripCard } from './card.js';
 import { DAY_LABEL, feedPage, feedUrl, MONTHS, PAGE, readFeedUrl, searchTerm } from './data/feed.js';
 import { cardsLoading } from './layout/shared/skeleton.js';
 import { mountExplore } from './layout/pc/explore.js';
@@ -56,8 +56,39 @@ function activeChips() {
   ].filter(Boolean));
 }
 
+/*
+ * Os roteiros feitos com IA (esquema 17): uma fila à parte, por cima das
+ * viagens de pessoas e nunca misturados com elas. Só no feed sem filtros.
+ */
+const aiTrack = el('div', { class: 'ai-track' });
+const aiRow = el('section', { class: 'ai-row hidden', 'aria-labelledby': 'ai-row-title' },
+  el('div', { class: 'ai-row-head' },
+    el('h2', { id: 'ai-row-title' }, 'Feitos com IA'),
+    el('p', { class: 'muted small' }, 'Roteiros escritos com a ajuda de uma IA. Ainda ninguém os fez com o Plan-ish.')),
+  aiTrack);
+status.before(aiRow);
+let aiLoaded = false;
+
+function aiTile(it) {
+  return el('a', { class: 'ai-tile', href: `itinerario.html?id=${encodeURIComponent(it.id)}` },
+    el('div', { class: 'ai-cover' }, routeCover(it), el('span', { class: 'media-badge' }, aiBadge())),
+    el('strong', {}, it.title),
+    el('span', { class: 'muted small' }, [it.destination, `${plural(it.day_count, 'dia', 'dias')} · ${plural(it.stop_count, 'paragem', 'paragens')}`].filter(Boolean).join(' · ')));
+}
+
+async function loadAi() {
+  if (aiLoaded) return;
+  aiLoaded = true;
+  const { data, error } = await sb.rpc('feed_page', { p_tab: 'ai', p_limit: 12 }).select(CARD_COLUMNS);
+  if (error || !data?.length) return; // sem o esquema 17, ou ainda nenhum: a fila não aparece
+  aiTrack.replaceChildren(...data.map(aiTile));
+  paint();
+}
+
 /** Os botões e a pesquisa a mostrar o estado atual. */
 function paint() {
+  const plain = !state.level && !state.words && !state.days && !state.month && (state.view === 'popular' || state.view === 'recent');
+  show(aiRow, plain && aiTrack.childElementCount > 0);
   for (const tab of tabs) tab.setAttribute('aria-pressed', String((tab.dataset.level ?? '') === state.level));
   for (const button of views) button.setAttribute('aria-pressed', String(button.dataset.view === state.view));
   if (searchTerm(search.value) !== state.words) search.value = state.words;
@@ -133,6 +164,7 @@ arrange(document.documentElement.dataset.layout);
 addEventListener('planish:layout', (e) => arrange(e.detail));
 
 paint();
+void loadAi();
 await load(false);
 
 async function load(append) {

@@ -5,6 +5,7 @@
 // legenda: o título diz o que é. Barras finas na cor de destaque, com o
 // valor ao passar o dedo ou o rato, e a tabela com os números por baixo.
 import { $, el, explain, header, notice, sb, show, signInLink } from './app.js';
+import { mountPublish } from './admin-publish.js';
 
 const session = await header('');
 const status = $('status');
@@ -61,6 +62,8 @@ else {
         void load();
       });
     }
+    show($('publish'), true);
+    mountPublish();
     await load();
   }
 }

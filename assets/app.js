@@ -154,6 +154,11 @@ const BADGES = {
   plan: { label: 'Roteiro', icon: 'route' },
 };
 
+/** Um roteiro escrito com a ajuda de uma IA (esquema 17): sempre dito. */
+export function aiBadge() {
+  return el('span', { class: 'badge ai' }, 'Feito com IA');
+}
+
 /** O selo de quanto a viagem foi mesmo feita. */
 export function badge(level) {
   const b = BADGES[level] ?? BADGES.plan;

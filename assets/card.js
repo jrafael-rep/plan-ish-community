@@ -1,13 +1,13 @@
 // O cartão de uma viagem: igual no feed, na página do itinerário e no perfil.
 // A app desenha o mesmo cartão no separador Comunidade.
 import {
-  appScheme, badge, budgetText, el, explain, hue, icon, monthLabel, plural, photoUrl, relativeDay, sb, signInLink, starText, who,
+  aiBadge, appScheme, badge, budgetText, el, explain, hue, icon, monthLabel, plural, photoUrl, relativeDay, sb, signInLink, starText, who,
 } from './app.js';
 
 export const CARD_COLUMNS = 'id, title, destination, summary, day_count, stop_count, travelled_month, like_count, comment_count, '
   + 'created_at, evidence, visited_stops, gps_stops, done_count, original_done_count, budget_min, budget_max, photos, plan, '
   + 'author_id, author:profiles!itineraries_author_id_fkey(display_name), '
-  + 'review_count, rating_count, rating_avg, verified_rating_count, verified_rating_avg';
+  + 'review_count, rating_count, rating_avg, verified_rating_count, verified_rating_avg, origin';
 
 /**
  * Enquanto os esquemas 3 e 4 não correm na base de dados, as colunas novas
@@ -78,7 +78,7 @@ function media(it, photos = Array.isArray(it.photos) ? it.photos.slice(0, 6) : [
   const facts = el('span', { class: 'media-facts' },
     icon('route'), `${plural(it.day_count, 'dia', 'dias')} · ${plural(it.stop_count, 'paragem', 'paragens')}`);
   if (!photos.length) {
-    return el('div', { class: 'media' }, routeCover(it), el('span', { class: 'media-badge' }, badge(it.evidence)),
+    return el('div', { class: 'media' }, routeCover(it), el('span', { class: 'media-badge' }, badge(it.evidence), it.origin === 'ai' ? aiBadge() : null),
       it.destination ? el('span', { class: 'media-place' }, it.destination) : null, facts);
   }
   const track = el('div', { class: 'slides', tabindex: '0', 'aria-label': `Fotografias de ${it.title}` },
@@ -89,7 +89,7 @@ function media(it, photos = Array.isArray(it.photos) ? it.photos.slice(0, 6) : [
       // Uma fotografia que não abre sai; sem nenhuma, fica a capa do percurso.
       onerror: () => box.replaceWith(media(it, photos.filter((x) => x !== p))),
     })));
-  const box = el('div', { class: 'media' }, track, el('span', { class: 'media-badge' }, badge(it.evidence)), facts);
+  const box = el('div', { class: 'media' }, track, el('span', { class: 'media-badge' }, badge(it.evidence), it.origin === 'ai' ? aiBadge() : null), facts);
   if (photos.length > 1) {
     const dots = el('div', { class: 'dots', 'aria-hidden': 'true' }, ...photos.map((_, i) => el('i', { class: i ? '' : 'on' })));
     const go = (d) => track.scrollBy({ left: d * track.clientWidth, behavior: 'smooth' });
@@ -132,6 +132,7 @@ export function dayList(plan) {
 function evidenceNote(it) {
   if (it.evidence === 'original') return `O GPS confirmou ${it.gps_stops} de ${plural(it.visited_stops, 'paragem visitada', 'paragens visitadas')}.`;
   if (it.evidence === 'done') return `${plural(it.visited_stops, 'paragem visitada', 'paragens visitadas')}, marcadas sobretudo à mão.`;
+  if (it.origin === 'ai') return 'Um roteiro escrito com a ajuda de uma IA e revisto por quem gere a Comunidade. Ainda ninguém o fez com o Plan-ish: confirma horários e sítios antes de ir.';
   return 'Um plano: a viagem não foi registada pelo telemóvel.';
 }
 

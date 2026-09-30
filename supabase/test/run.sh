@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa os esquemas (001 a 016) num Postgres 16 local que imita o Supabase.
+# Testa os esquemas (001 a 017) num Postgres 16 local que imita o Supabase.
 # Uso: sudo bash supabase/test/run.sh   (precisa do utilizador postgres)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -9,10 +9,10 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" "$HERE/../015_app_feed.sql" "$HERE/../016_metrics.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" "$HERE/../015_app_feed.sql" "$HERE/../016_metrics.sql" "$HERE/../017_ai_plans.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
-su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql -f $S/014_notifications.sql -f $S/014_notifications.sql -f $S/015_app_feed.sql -f $S/015_app_feed.sql -f $S/016_metrics.sql -f $S/016_metrics.sql" 2>&1 | grep -v NOTICE
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql -f $S/014_notifications.sql -f $S/014_notifications.sql -f $S/015_app_feed.sql -f $S/015_app_feed.sql -f $S/016_metrics.sql -f $S/016_metrics.sql -f $S/017_ai_plans.sql -f $S/017_ai_plans.sql" 2>&1 | grep -v NOTICE
 
 FAILS=0
 # Os termos (esquema 7) só se exigem nos testes do fim; até lá, como antes.
@@ -517,5 +517,14 @@ expect "o painel é só para quem modera" 'not_admin|forbidden|admin' "$(q authe
 expect "anon não vê o painel" 'permission denied' "$(q anon '' "select public.admin_metrics(30)")"
 expect "o painel: totais, séries de 30 dias e cópias" '^true\|30\|2$' "$(q authenticated $MADM "select ((m->'totals'->>'accounts')::int > 0) ||'|'|| jsonb_array_length(m->'series'->'app_copy') ||'|'|| (m->'totals'->>'copies') from public.admin_metrics(30) m")"
 expect "o painel mostra o mais copiado" "^$MIID\$" "$(q authenticated $MADM "select m->'top'->'app_copy'->0->>'id' from public.admin_metrics(7) m")"
+
+# ---- 017: roteiros feitos com IA ----
+AIPLAN='{"schemaVersion":2,"type":"trip_plan","name":"IA","home":{"lat":38.7,"lon":-9.1},"participants":[{"id":"p","name":"X"}],"days":[{"date":"2027-06-07","stops":[{"name":"A"},{"name":"B"}]},{"date":"2027-06-08","stops":[{"name":"C"}]}]}'
+expect "só quem gere publica planos" 'not_admin' "$(q authenticated $C "select public.admin_publish_plan('Roteiro', 'Sítio', null, '$AIPLAN'::jsonb)")"
+AIID=$(q authenticated $MADM "select public.admin_publish_plan('Costa em 2 dias', 'Costa', 'Resumo', '$AIPLAN'::jsonb)")
+expect "publicado: 2 dias, 3 paragens, roteiro, IA, sem campos pessoais" '^2\|3\|plan\|ai\|false\|false$' "$(adm "select day_count||'|'||stop_count||'|'||evidence||'|'||origin||'|'||(plan ? 'home')||'|'||(plan ? 'participants') from public.itineraries where id = '$AIID'")"
+expect "um plano sem dias é recusado" 'plan_days_invalid' "$(q authenticated $MADM "select public.admin_publish_plan('X', null, null, '{\"days\":[]}'::jsonb)")"
+expect "fora do feed de viagens" '^0\|0$' "$(q anon '' "select (select count(*) from public.feed_page('popular') where id = '$AIID')||'|'||(select count(*) from public.feed_page('recent') where id = '$AIID')")"
+expect "no carrossel dos feitos com IA, e só eles" '^1\|0$' "$(q anon '' "select (select count(*) from public.feed_page('ai') where id = '$AIID')||'|'||(select count(*) from public.feed_page('ai') where origin <> 'ai')")"
 
 echo; [ $FAILS -eq 0 ] && echo "Tudo certo." || { echo "$FAILS falhas."; exit 1; }

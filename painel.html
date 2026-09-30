@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://gmizaoscvwarsppcmfpr.supabase.co wss://gmizaoscvwarsppcmfpr.supabase.co https://cdn.jsdelivr.net; img-src 'self' data: https://gmizaoscvwarsppcmfpr.supabase.co; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://nominatim.openstreetmap.org https://gmizaoscvwarsppcmfpr.supabase.co wss://gmizaoscvwarsppcmfpr.supabase.co https://cdn.jsdelivr.net; img-src 'self' data: https://gmizaoscvwarsppcmfpr.supabase.co; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; base-uri 'self'; form-action 'self'">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#D5E7E6">
 <script src="assets/theme.js"></script>
@@ -42,6 +42,16 @@
   </div>
 </div>
 <div id="status"></div>
+<section id="publish" class="hidden adm-publish">
+  <details>
+    <summary><strong>Publicar um roteiro a partir de um JSON</strong></summary>
+    <p class="muted small">Cola o JSON (o formato de importação da app, como o que o ChatGPT devolve). Vês as paragens, procuras no mapa as que não têm localização, confirmas, e publicas em teu nome como "Roteiro". Casa, pessoas e responsáveis saem sempre.</p>
+    <label for="plan-json" class="small">JSON do plano</label>
+    <textarea id="plan-json" rows="8" spellcheck="false"></textarea>
+    <p class="row"><button class="btn" type="button" id="plan-read">Ler o plano</button></p>
+    <div id="plan-preview"></div>
+  </details>
+</section>
 <section id="panel" class="hidden" aria-live="polite">
   <h2>Agora</h2>
   <div id="tiles" class="adm-tiles"></div>
