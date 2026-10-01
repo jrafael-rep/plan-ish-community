@@ -68,7 +68,7 @@ function paint() {
       el('label', { for: 'plan-title' }, 'Título'), title,
       el('label', { for: 'plan-dest' }, 'Destino'), dest,
       el('label', { for: 'plan-summary' }, 'Resumo (opcional)'), summary,
-      el('label', { class: 'check' }, ai, 'Feito com IA (aparece na fila "Feitos com IA", com a etiqueta)')),
+      el('label', { class: 'check' }, ai, 'Feito com IA (aparece na fila "Feitos com IA", com a etiqueta, assinado por AI-ish)')),
     el('p', { class: 'row' }, el('button', { class: 'btn primary', type: 'button', onclick: (e) => void publish(e.currentTarget) }, 'Publicar como roteiro')),
     el('div', { id: 'plan-status' }),
   ].filter(Boolean));
