@@ -540,6 +540,14 @@ expect "um novo, publicado por quem gere, assinado pela AI-ish" "^$AIU\$" "$(adm
 TRIP2=$(q authenticated $MADM "select public.admin_publish_plan('Plano meu', 'Serra', null, '$AIPLAN'::jsonb, false)")
 expect "sem a marca de IA, fica em nome de quem publica" "^$MADM\$" "$(adm "select author_id from public.itineraries where id = '$TRIP2'")"
 expect "só quem gere publica, mesmo assinando como AI-ish" 'not_admin' "$(q authenticated $C "select public.admin_publish_plan('X', null, null, '$AIPLAN'::jsonb)")"
+# Com os termos em vigor: quem gere tem de os ter aceitado; a AI-ish não precisa.
+adm "update public.community_settings set terms_version = 't9'" >/dev/null
+expect "quem gere sem os termos não publica" 'terms_required' "$(q authenticated $MADM "select public.admin_publish_plan('Termos', null, null, '$AIPLAN'::jsonb)")"
+adm "insert into private.terms_acceptances (user_id, version) values ('$MADM', 't9')" >/dev/null
+AI3=$(q authenticated $MADM "select public.admin_publish_plan('Com termos', null, null, '$AIPLAN'::jsonb)")
+expect "com os termos aceites, publica assinado pela AI-ish" "^$AIU\$" "$(adm "select author_id from public.itineraries where id = '$AI3'")"
+expect "uma pessoa sem os termos continua sem publicar" 'terms_required' "$(adm "insert into public.itineraries (author_id, title, day_count, stop_count, plan) values ('$C', 'X', 1, 1, '{}')" 2>&1)"
+adm "update public.community_settings set terms_version = null" >/dev/null
 expect "ninguém lê quem é a AI-ish por fora" 'permission denied|does not exist' "$(q authenticated $C "select user_id from private.ai_author")"
 
 echo; [ $FAILS -eq 0 ] && echo "Tudo certo." || { echo "$FAILS falhas."; exit 1; }

@@ -41,6 +41,26 @@ begin
   update public.itineraries set author_id = ai where origin = 'ai' and author_id <> ai;
 end $$;
 
+-- Os termos de utilização são de pessoas. A AI-ish não os aceita porque não é
+-- ninguém: quem responde pelo que ela publica é quem gere, e é a esse que
+-- admin_publish_plan os pede. O resto da verificação fica igual.
+create or replace function private.check_author()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if new.author_id = (select user_id from private.ai_author) then
+    return new;
+  end if;
+  if private.is_blocked(new.author_id) then
+    raise exception 'account_blocked' using errcode = '42501',
+      hint = 'Esta conta foi bloqueada na Comunidade por não cumprir os termos de utilização.';
+  end if;
+  if not private.accepted_terms(new.author_id) then
+    raise exception 'terms_required' using errcode = '42501',
+      hint = 'Para publicar, comentar ou avaliar, aceita primeiro os termos de utilização da Comunidade.';
+  end if;
+  return new;
+end $$;
+
 -- Quem publica continua a ser quem gere a Comunidade; quem assina é a AI-ish.
 create or replace function public.admin_publish_plan(
   p_title text,
@@ -59,6 +79,10 @@ declare
                 from jsonb_array_elements(case when jsonb_typeof(clean->'days') = 'array' then clean->'days' else '[]'::jsonb end) d);
   new_id uuid;
 begin
+  if not private.accepted_terms(uid) then
+    raise exception 'terms_required' using errcode = '42501',
+      hint = 'Para publicar, comentar ou avaliar, aceita primeiro os termos de utilização da Comunidade.';
+  end if;
   if nullif(btrim(p_title), '') is null then
     raise exception 'title_required' using errcode = '22023';
   end if;
