@@ -64,7 +64,7 @@ const aiTrack = el('div', { class: 'ai-track' });
 const aiRow = el('section', { class: 'ai-row hidden', 'aria-labelledby': 'ai-row-title' },
   el('div', { class: 'ai-row-head' },
     el('h2', { id: 'ai-row-title' }, 'Feitos com IA'),
-    el('p', { class: 'muted small' }, 'Roteiros escritos com a ajuda de uma IA. Ainda ninguém os fez com o Plan-ish.')),
+    el('p', { class: 'muted small' }, 'Roteiros criados com IA, para começar a planear. Ainda ninguém os fez com o Plan-ish.')),
   aiTrack);
 status.before(aiRow);
 let aiLoaded = false;

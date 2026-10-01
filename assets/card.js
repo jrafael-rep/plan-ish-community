@@ -132,7 +132,7 @@ export function dayList(plan) {
 function evidenceNote(it) {
   if (it.evidence === 'original') return `O GPS confirmou ${it.gps_stops} de ${plural(it.visited_stops, 'paragem visitada', 'paragens visitadas')}.`;
   if (it.evidence === 'done') return `${plural(it.visited_stops, 'paragem visitada', 'paragens visitadas')}, marcadas sobretudo à mão.`;
-  if (it.origin === 'ai') return 'Um roteiro escrito com a ajuda de uma IA e revisto por quem gere a Comunidade. Ainda ninguém o fez com o Plan-ish: confirma horários e sítios antes de ir.';
+  if (it.origin === 'ai') return 'Criado com IA. Ainda ninguém o fez com o Plan-ish, por isso confirma horários e moradas antes de ir.';
   return 'Um plano: a viagem não foi registada pelo telemóvel.';
 }
 

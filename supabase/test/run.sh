@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa os esquemas (001 a 017) num Postgres 16 local que imita o Supabase.
+# Testa os esquemas (001 a 018) num Postgres 16 local que imita o Supabase.
 # Uso: sudo bash supabase/test/run.sh   (precisa do utilizador postgres)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -9,7 +9,7 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" "$HERE/../015_app_feed.sql" "$HERE/../016_metrics.sql" "$HERE/../017_ai_plans.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" "$HERE/../015_app_feed.sql" "$HERE/../016_metrics.sql" "$HERE/../017_ai_plans.sql" "$HERE/../018_ai_author.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
 su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql -f $S/014_notifications.sql -f $S/014_notifications.sql -f $S/015_app_feed.sql -f $S/015_app_feed.sql -f $S/016_metrics.sql -f $S/016_metrics.sql -f $S/017_ai_plans.sql -f $S/017_ai_plans.sql" 2>&1 | grep -v NOTICE
@@ -526,5 +526,20 @@ expect "publicado: 2 dias, 3 paragens, roteiro, IA, sem campos pessoais" '^2\|3\
 expect "um plano sem dias é recusado" 'plan_days_invalid' "$(q authenticated $MADM "select public.admin_publish_plan('X', null, null, '{\"days\":[]}'::jsonb)")"
 expect "fora do feed de viagens" '^0\|0$' "$(q anon '' "select (select count(*) from public.feed_page('popular') where id = '$AIID')||'|'||(select count(*) from public.feed_page('recent') where id = '$AIID')")"
 expect "no carrossel dos feitos com IA, e só eles" '^1\|0$' "$(q anon '' "select (select count(*) from public.feed_page('ai') where id = '$AIID')||'|'||(select count(*) from public.feed_page('ai') where origin <> 'ai')")"
+
+# ---- 018: a conta AI-ish assina os roteiros feitos com IA ----
+# Um nome dado por alguém ao próximo viajante, à espera: a AI-ish não o pode levar.
+GIFT=$(adm "update public.name_pool set gifted_by = '$MADM', gifted_at = now() where name = (select name from public.name_pool where taken_by is null order by name limit 1) returning name" | head -1)
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/018_ai_author.sql -f $S/018_ai_author.sql" 2>&1 | grep -v NOTICE
+AIU=$(adm "select user_id from private.ai_author")
+expect "uma só conta AI-ish, sem email" '^1\|AI-ish\|true$' "$(adm "select (select count(*) from private.ai_author)||'|'||(select display_name from public.profiles where id = '$AIU')||'|'||((select email from auth.users where id = '$AIU') is null)")"
+expect "o nome dado continua à espera de quem chegar" '^\|true$' "$(adm "select coalesce(taken_by::text, '')||'|'||(gifted_by = '$MADM') from public.name_pool where name = '$GIFT'")"
+expect "o roteiro já publicado passa para a AI-ish" "^$AIU\$" "$(adm "select author_id from public.itineraries where id = '$AIID'")"
+AI2=$(q authenticated $MADM "select public.admin_publish_plan('Serra em 2 dias', 'Serra', null, '$AIPLAN'::jsonb)")
+expect "um novo, publicado por quem gere, assinado pela AI-ish" "^$AIU\$" "$(adm "select author_id from public.itineraries where id = '$AI2'")"
+TRIP2=$(q authenticated $MADM "select public.admin_publish_plan('Plano meu', 'Serra', null, '$AIPLAN'::jsonb, false)")
+expect "sem a marca de IA, fica em nome de quem publica" "^$MADM\$" "$(adm "select author_id from public.itineraries where id = '$TRIP2'")"
+expect "só quem gere publica, mesmo assinando como AI-ish" 'not_admin' "$(q authenticated $C "select public.admin_publish_plan('X', null, null, '$AIPLAN'::jsonb)")"
+expect "ninguém lê quem é a AI-ish por fora" 'permission denied|does not exist' "$(q authenticated $C "select user_id from private.ai_author")"
 
 echo; [ $FAILS -eq 0 ] && echo "Tudo certo." || { echo "$FAILS falhas."; exit 1; }
