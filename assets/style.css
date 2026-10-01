@@ -268,7 +268,10 @@ a.who:hover { color: var(--accent); }
 .profile p { margin: .15rem 0 0; }
 .you { font-size: .75rem; font-weight: 800; padding: .15rem .55rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
 .names { display: grid; gap: .3rem; margin-top: .4rem !important; color: var(--muted); }
-.names span { display: inline-flex; align-items: center; gap: .35rem; }
+.profile > div { flex: 1; min-width: 0; }
+/* "Deu o nome a" numa linha; um nome comprido encurta com reticências. */
+.names > span { display: flex; align-items: center; gap: .35rem; min-width: 0; white-space: nowrap; }
+.names .who { flex: 0 1 auto; }
 .names .avatar { width: 22px; height: 22px; font-size: .55rem; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); text-align: center; }
 .stat b { display: block; font-size: 1.35rem; font-weight: 800; }
