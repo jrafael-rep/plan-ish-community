@@ -68,13 +68,19 @@ else {
   }
 }
 
+/** As contas da equipa (quem gere, a AI-ish) não entram nas contagens de pessoas. */
+function team(n) {
+  if (!Number.isFinite(n) || n === 0) return '';
+  return n === 1 ? ' Sem 1 conta da equipa.' : ` Sem ${n} contas da equipa.`;
+}
+
 async function load() {
   const { data, error } = await sb.rpc('admin_metrics', { p_days: days });
   if (error) { notice(status, explain(error), 'error'); return; }
   status.replaceChildren();
   show($('panel'), true);
   const dates = datesFrom(data.since, data.days);
-  $('span').textContent = `De ${dayFmt.format(dates[0])} a ${dayFmt.format(dates.at(-1))}.`;
+  $('span').textContent = `De ${dayFmt.format(dates[0])} a ${dayFmt.format(dates.at(-1))}.${team(data.totals.team_excluded)}`;
   $('tiles').replaceChildren(...TILES.map(([key, label, note]) => tile(data.totals, key, label, note)), evidenceTile(data.totals.by_evidence));
   $('charts').replaceChildren(...CHARTS.map(([keys, label]) => chart(label, sum(data.series, keys), dates)));
   $('funnel').replaceChildren(funnel(data.series));

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testa os esquemas (001 a 018) num Postgres 16 local que imita o Supabase.
+# Testa os esquemas (001 a 019) num Postgres 16 local que imita o Supabase.
 # Uso: sudo bash supabase/test/run.sh   (precisa do utilizador postgres)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -9,7 +9,7 @@ if [ ! -d $S/data ]; then
   su postgres -c "/usr/lib/postgresql/16/bin/initdb -D $S/data -A trust >/dev/null"
 fi
 su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log status >/dev/null || /usr/lib/postgresql/16/bin/pg_ctl -D $S/data -o '-p $PORT -k $S' -l $S/log start >/dev/null"
-cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" "$HERE/../015_app_feed.sql" "$HERE/../016_metrics.sql" "$HERE/../017_ai_plans.sql" "$HERE/../018_ai_author.sql" $S/ && chmod 644 $S/*.sql
+cp "$HERE/supabase-shim.sql" "$HERE/../001_community.sql" "$HERE/../002_names.sql" "$HERE/../003_originals_and_replies.sql" "$HERE/../004_budget_and_photos.sql" "$HERE/../005_shared_plans.sql" "$HERE/../006_private_rls.sql" "$HERE/../007_reviews_terms_moderation.sql" "$HERE/../008_withdraw_and_photo_cleanup.sql" "$HERE/../009_record_seals.sql" "$HERE/../010_points.sql" "$HERE/../011_feed_tabs.sql" "$HERE/../012_explore.sql" "$HERE/../013_social.sql" "$HERE/../014_notifications.sql" "$HERE/../015_app_feed.sql" "$HERE/../016_metrics.sql" "$HERE/../017_ai_plans.sql" "$HERE/../018_ai_author.sql" "$HERE/../019_metrics_without_team.sql" $S/ && chmod 644 $S/*.sql
 PSQL="psql -h $S -p $PORT -U postgres"
 su postgres -c "$PSQL -qc 'drop database if exists sb' -c 'create database sb'"
 su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/supabase-shim.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/001_community.sql -f $S/002_names.sql -f $S/003_originals_and_replies.sql -f $S/004_budget_and_photos.sql -f $S/005_shared_plans.sql -f $S/006_private_rls.sql -f $S/007_reviews_terms_moderation.sql -f $S/007_reviews_terms_moderation.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/008_withdraw_and_photo_cleanup.sql -f $S/009_record_seals.sql -f $S/009_record_seals.sql -f $S/010_points.sql -f $S/010_points.sql -f $S/011_feed_tabs.sql -f $S/011_feed_tabs.sql -f $S/012_explore.sql -f $S/012_explore.sql -f $S/013_social.sql -f $S/013_social.sql -f $S/014_notifications.sql -f $S/014_notifications.sql -f $S/015_app_feed.sql -f $S/015_app_feed.sql -f $S/016_metrics.sql -f $S/016_metrics.sql -f $S/017_ai_plans.sql -f $S/017_ai_plans.sql" 2>&1 | grep -v NOTICE
@@ -549,5 +549,19 @@ expect "com os termos aceites, publica assinado pela AI-ish" "^$AIU\$" "$(adm "s
 expect "uma pessoa sem os termos continua sem publicar" 'terms_required' "$(adm "insert into public.itineraries (author_id, title, day_count, stop_count, plan) values ('$C', 'X', 1, 1, '{}')" 2>&1)"
 adm "update public.community_settings set terms_version = null" >/dev/null
 expect "ninguém lê quem é a AI-ish por fora" 'permission denied|does not exist' "$(q authenticated $C "select user_id from private.ai_author")"
+
+# Esquema 19: as métricas sem a equipa (quem gere, a AI-ish, contas postas de fora).
+su postgres -c "$PSQL -d sb -q -v ON_ERROR_STOP=1 -f $S/019_metrics_without_team.sql -f $S/019_metrics_without_team.sql" 2>&1 | grep -v NOTICE
+REAL=$(adm "select count(*) from public.profiles p where not exists (select 1 from private.admins a where a.user_id = p.id) and p.id <> (select user_id from private.ai_author)")
+expect "as contas da equipa não contam como contas" "^$REAL\$" "$(q authenticated $MADM "select m->'totals'->>'accounts' from public.admin_metrics(30) m")"
+expect "o painel diz quantas ficaram de fora" '^[1-9][0-9]*$' "$(q authenticated $MADM "select m->'totals'->>'team_excluded' from public.admin_metrics(30) m")"
+L0=$(q authenticated $MADM "select m->'totals'->>'likes' from public.admin_metrics(30) m")
+adm "insert into private.metrics_excluded (user_id) values ('$C') on conflict do nothing" >/dev/null
+expect "uma conta posta de fora deixa de contar" "^$((REAL - 1))\$" "$(q authenticated $MADM "select m->'totals'->>'accounts' from public.admin_metrics(30) m")"
+expect "os gostos dela também" '^[0-9]+$' "$(q authenticated $MADM "select m->'totals'->>'likes' from public.admin_metrics(30) m")"
+expect "ninguém lê a lista de fora pela API" 'permission denied|does not exist' "$(q authenticated $C "select * from private.metrics_excluded")"
+adm "delete from private.metrics_excluded where user_id = '$C'" >/dev/null
+expect "tirada da lista, volta a contar" "^$REAL\$" "$(q authenticated $MADM "select m->'totals'->>'accounts' from public.admin_metrics(30) m")"
+expect "o mesmo número de gostos de antes" "^$L0\$" "$(q authenticated $MADM "select m->'totals'->>'likes' from public.admin_metrics(30) m")"
 
 echo; [ $FAILS -eq 0 ] && echo "Tudo certo." || { echo "$FAILS falhas."; exit 1; }
